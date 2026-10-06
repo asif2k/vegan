@@ -144,7 +144,7 @@
       "generated": {
         "height": 0.68,
         "radius": 0.42,
-        "vertices": 2076
+        "vertices": 2040
       },
       "props": {
         "bladeLength": 0.55,
@@ -167,8 +167,8 @@
         "bladeColorTipG": 0.6,
         "bladeColorTipB": 0.22,
         "colorVariance": 0.1,
-        "flowerChance": 0.18,
-        "flowerSize": 0.03,
+        "flowerChance": 0.12,
+        "flowerSize": 0.014,
         "flowerColorR": 0.72,
         "flowerColorG": 0.62,
         "flowerColorB": 0.34,
