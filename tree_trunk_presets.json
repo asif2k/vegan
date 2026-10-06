@@ -1,9 +1,9 @@
 {
   "format": "vegan tree_props presets",
   "notes": [
-    "Each \"props\" object has all 37 tree_props fields, named and ordered exactly as the C++ struct in tree_system.cpp (and TREE_PROP_NAMES in tests.js), so it can be assigned straight onto the tree props object: for (k in props) tree[k] = props[k]; tree.needs_update = true.",
-    "Units: 1 unit ~ 1 m. The coast redwood is scaled down, and all values stay inside the tests.js slider ranges.",
-    "Keep clumpMax <= 0.95, clumpMin <= 0.85 and branchFactor >= 2: nearly parallel child branches make tree_generate emit NaN vertices."
+    "Each \"props\" object has all 41 tree_props fields, named and ordered exactly as the C++ struct in tree_system.cpp (and TREE_PROP_NAMES in tests.js), so it can be assigned straight onto the tree props object: for (k in props) tree[k] = props[k]; tree.needs_update = true.",
+    "Units: 1 unit ~ 1 m. The coast redwood is scaled down, and all values stay inside the tests.js slider ranges. The stored seed is a typical-looking one; other seeds give natural variation (see generated.height_over_seeds_1_to_12) because lengthJitter, radiusJitter, azimuthJitter and elevationJitter are non-zero.",
+    "Requires the 41-prop tree_system.cpp (the four jitter props are the last four fields); set them to 0 for the old, regular branching."
   ],
   "prop_order": [
     "clumpMax",
@@ -42,7 +42,11 @@
     "levels",
     "rootFlare",
     "twigAngleJitter",
-    "fruitClusterCount"
+    "fruitClusterCount",
+    "lengthJitter",
+    "radiusJitter",
+    "azimuthJitter",
+    "elevationJitter"
   ],
   "trees": [
     {
@@ -55,10 +59,14 @@
         "dbh_m": "1.0-1.5"
       },
       "generated": {
-        "height": 18.4,
-        "dbh": 1.14,
-        "crown_width": 19.3,
-        "woody_vertices": 6864
+        "height": 22.7,
+        "dbh": 1.17,
+        "crown_width": 23.7,
+        "woody_vertices": 6864,
+        "height_over_seeds_1_to_12": [
+          17.2,
+          28.6
+        ]
       },
       "props": {
         "clumpMax": 0.6,
@@ -67,19 +75,19 @@
         "lengthFalloffPower": 1,
         "branchFactor": 2.2,
         "radiusFalloffRate": 0.78,
-        "climbRate": 1.9,
+        "climbRate": 2.145,
         "trunkKink": 0.35,
         "maxRadius": 0.36,
         "taperRate": 0.9,
         "twistRate": 7,
         "sweepAmount": 0,
-        "initialBranchLength": 3.6,
-        "trunkLength": 3.6,
+        "initialBranchLength": 4.063,
+        "trunkLength": 4.063,
         "dropAmount": 0.25,
         "growAmount": 0,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 37,
         "branchFactorTrunk": 2,
         "clumpMaxTrunk": 0.6,
         "clumpMinTrunk": 0.3,
@@ -97,7 +105,11 @@
         "levels": 4,
         "rootFlare": 0.45,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 1,
+        "elevationJitter": 0.35
       }
     },
     {
@@ -110,10 +122,14 @@
         "dbh_m": "0.4-0.7"
       },
       "generated": {
-        "height": 24.8,
+        "height": 25.1,
         "dbh": 0.54,
-        "crown_width": 5.8,
-        "woody_vertices": 5136
+        "crown_width": 6.4,
+        "woody_vertices": 5136,
+        "height_over_seeds_1_to_12": [
+          22.5,
+          28.6
+        ]
       },
       "props": {
         "clumpMax": 0.8,
@@ -134,7 +150,7 @@
         "growAmount": 0.6,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 30,
         "branchFactorTrunk": 2.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -152,7 +168,11 @@
         "levels": 3,
         "rootFlare": 0.15,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.2,
+        "radiusJitter": 0.1,
+        "azimuthJitter": 0.4,
+        "elevationJitter": 0.15
       }
     },
     {
@@ -165,10 +185,14 @@
         "dbh_m": "0.2-0.3"
       },
       "generated": {
-        "height": 16.6,
-        "dbh": 0.25,
-        "crown_width": 5,
-        "woody_vertices": 9168
+        "height": 14.9,
+        "dbh": 0.24,
+        "crown_width": 5.2,
+        "woody_vertices": 9168,
+        "height_over_seeds_1_to_12": [
+          12.1,
+          18.2
+        ]
       },
       "props": {
         "clumpMax": 0.75,
@@ -177,19 +201,19 @@
         "lengthFalloffPower": 1,
         "branchFactor": 3.5,
         "radiusFalloffRate": 0.6,
-        "climbRate": 1.5,
+        "climbRate": 1.264,
         "trunkKink": 0.25,
         "maxRadius": 0.075,
         "taperRate": 0.92,
         "twistRate": 13,
         "sweepAmount": 0,
-        "initialBranchLength": 1.8,
-        "trunkLength": 4.5,
+        "initialBranchLength": 1.516,
+        "trunkLength": 3.791,
         "dropAmount": 0.5,
         "growAmount": 0.4,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 30,
         "branchFactorTrunk": 3.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -207,7 +231,11 @@
         "levels": 4,
         "rootFlare": 0.15,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 0.8,
+        "elevationJitter": 0.3
       }
     },
     {
@@ -220,10 +248,14 @@
         "dbh_m": "0.3-0.5"
       },
       "generated": {
-        "height": 20.1,
+        "height": 20.3,
         "dbh": 0.35,
-        "crown_width": 1.6,
-        "woody_vertices": 6288
+        "crown_width": 1.8,
+        "woody_vertices": 6288,
+        "height_over_seeds_1_to_12": [
+          19.4,
+          21.2
+        ]
       },
       "props": {
         "clumpMax": 0.93,
@@ -244,7 +276,7 @@
         "growAmount": 1,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 14,
         "branchFactorTrunk": 3.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -262,7 +294,11 @@
         "levels": 3,
         "rootFlare": 0.2,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.15,
+        "radiusJitter": 0.1,
+        "azimuthJitter": 0.5,
+        "elevationJitter": 0.1
       }
     },
     {
@@ -275,10 +311,14 @@
         "dbh_m": "3-5"
       },
       "generated": {
-        "height": 41,
-        "dbh": 2.88,
-        "crown_width": 5.9,
-        "woody_vertices": 6288
+        "height": 41.5,
+        "dbh": 2.87,
+        "crown_width": 6.5,
+        "woody_vertices": 6288,
+        "height_over_seeds_1_to_12": [
+          39.4,
+          44.8
+        ]
       },
       "props": {
         "clumpMax": 0.9,
@@ -299,7 +339,7 @@
         "growAmount": 0,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 26,
         "branchFactorTrunk": 3.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -317,7 +357,11 @@
         "levels": 3,
         "rootFlare": 0.5,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.25,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 0.6,
+        "elevationJitter": 0.2
       }
     },
     {
@@ -330,10 +374,14 @@
         "dbh_m": "4-10"
       },
       "generated": {
-        "height": 18,
-        "dbh": 4.26,
-        "crown_width": 10.2,
-        "woody_vertices": 8568
+        "height": 16.6,
+        "dbh": 4.24,
+        "crown_width": 9.8,
+        "woody_vertices": 8568,
+        "height_over_seeds_1_to_12": [
+          14.3,
+          20.6
+        ]
       },
       "props": {
         "clumpMax": 0.5,
@@ -342,19 +390,19 @@
         "lengthFalloffPower": 1,
         "branchFactor": 3.5,
         "radiusFalloffRate": 0.7,
-        "climbRate": 2.5,
+        "climbRate": 2.258,
         "trunkKink": 0.25,
         "maxRadius": 1.4,
         "taperRate": 0.9,
         "twistRate": 13,
         "sweepAmount": 0,
-        "initialBranchLength": 2.4,
-        "trunkLength": 5.5,
+        "initialBranchLength": 2.168,
+        "trunkLength": 4.968,
         "dropAmount": 0.5,
         "growAmount": 0,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 9,
         "branchFactorTrunk": 3.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -372,7 +420,11 @@
         "levels": 4,
         "rootFlare": 0.15,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.2,
+        "azimuthJitter": 1,
+        "elevationJitter": 0.35
       }
     },
     {
@@ -385,10 +437,14 @@
         "dbh_m": "0.8-1.2"
       },
       "generated": {
-        "height": 11.3,
-        "dbh": 1.06,
-        "crown_width": 12.7,
-        "woody_vertices": 5712
+        "height": 14.3,
+        "dbh": 1.13,
+        "crown_width": 16.6,
+        "woody_vertices": 5712,
+        "height_over_seeds_1_to_12": [
+          12.4,
+          20.5
+        ]
       },
       "props": {
         "clumpMax": 0.55,
@@ -397,19 +453,19 @@
         "lengthFalloffPower": 1,
         "branchFactor": 2.2,
         "radiusFalloffRate": 0.72,
-        "climbRate": 1.4,
+        "climbRate": 1.718,
         "trunkKink": 0.4,
         "maxRadius": 0.35,
         "taperRate": 0.88,
         "twistRate": 5,
         "sweepAmount": 0,
-        "initialBranchLength": 3,
-        "trunkLength": 2.2,
+        "initialBranchLength": 3.681,
+        "trunkLength": 2.699,
         "dropAmount": -0.35,
         "growAmount": 0.9,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 31,
         "branchFactorTrunk": 3.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -427,7 +483,11 @@
         "levels": 4,
         "rootFlare": 0.5,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 1,
+        "elevationJitter": 0.3
       }
     },
     {
@@ -440,10 +500,14 @@
         "dbh_m": "0.3-0.8"
       },
       "generated": {
-        "height": 8.4,
-        "dbh": 0.69,
-        "crown_width": 7.6,
-        "woody_vertices": 8580
+        "height": 6.9,
+        "dbh": 0.78,
+        "crown_width": 6.9,
+        "woody_vertices": 8580,
+        "height_over_seeds_1_to_12": [
+          5.7,
+          10.9
+        ]
       },
       "props": {
         "clumpMax": 0.5,
@@ -452,19 +516,19 @@
         "lengthFalloffPower": 1,
         "branchFactor": 3.5,
         "radiusFalloffRate": 0.7,
-        "climbRate": 0.9,
+        "climbRate": 0.693,
         "trunkKink": 0.7,
-        "maxRadius": 0.2,
+        "maxRadius": 0.16,
         "taperRate": 0.9,
         "twistRate": 9,
         "sweepAmount": 0,
-        "initialBranchLength": 1.8,
-        "trunkLength": 1.4,
+        "initialBranchLength": 1.385,
+        "trunkLength": 1.078,
         "dropAmount": 0.5,
         "growAmount": 0,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 9,
         "branchFactorTrunk": 3.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -482,7 +546,11 @@
         "levels": 4,
         "rootFlare": 0.45,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.4,
+        "radiusJitter": 0.2,
+        "azimuthJitter": 1.4,
+        "elevationJitter": 0.5
       }
     },
     {
@@ -495,10 +563,14 @@
         "dbh_m": "0.5-0.9"
       },
       "generated": {
-        "height": 22.3,
-        "dbh": 0.68,
-        "crown_width": 12.6,
-        "woody_vertices": 9168
+        "height": 22.4,
+        "dbh": 0.67,
+        "crown_width": 14.2,
+        "woody_vertices": 9168,
+        "height_over_seeds_1_to_12": [
+          16.7,
+          33.2
+        ]
       },
       "props": {
         "clumpMax": 0.7,
@@ -507,19 +579,19 @@
         "lengthFalloffPower": 1,
         "branchFactor": 3.5,
         "radiusFalloffRate": 0.68,
-        "climbRate": 1.7,
+        "climbRate": 1.609,
         "trunkKink": 0.1,
         "maxRadius": 0.2,
         "taperRate": 0.93,
         "twistRate": 13,
         "sweepAmount": 0,
-        "initialBranchLength": 3.6,
-        "trunkLength": 5,
+        "initialBranchLength": 3.408,
+        "trunkLength": 4.733,
         "dropAmount": 0.5,
         "growAmount": 0.2,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 34,
         "branchFactorTrunk": 3.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -537,7 +609,11 @@
         "levels": 4,
         "rootFlare": 0.3,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 0.9,
+        "elevationJitter": 0.3
       }
     },
     {
@@ -550,10 +626,14 @@
         "dbh_m": "0.2-0.4"
       },
       "generated": {
-        "height": 19.5,
+        "height": 19.9,
         "dbh": 0.3,
-        "crown_width": 5.4,
-        "woody_vertices": 9168
+        "crown_width": 6,
+        "woody_vertices": 9168,
+        "height_over_seeds_1_to_12": [
+          16.8,
+          23.2
+        ]
       },
       "props": {
         "clumpMax": 0.85,
@@ -562,19 +642,19 @@
         "lengthFalloffPower": 1,
         "branchFactor": 3.5,
         "radiusFalloffRate": 0.6,
-        "climbRate": 1.5,
+        "climbRate": 1.454,
         "trunkKink": 0.06,
         "maxRadius": 0.09,
         "taperRate": 0.93,
         "twistRate": 13,
         "sweepAmount": 0,
-        "initialBranchLength": 2,
-        "trunkLength": 7,
+        "initialBranchLength": 1.939,
+        "trunkLength": 6.786,
         "dropAmount": 0.5,
         "growAmount": 0.4,
         "vMultiplier": 0.2,
         "twigScale": 2,
-        "seed": 10,
+        "seed": 30,
         "branchFactorTrunk": 3.5,
         "clumpMaxTrunk": 0.8,
         "clumpMinTrunk": 0.5,
@@ -592,7 +672,11 @@
         "levels": 4,
         "rootFlare": 0.1,
         "twigAngleJitter": 0,
-        "fruitClusterCount": 1
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.25,
+        "radiusJitter": 0.1,
+        "azimuthJitter": 0.6,
+        "elevationJitter": 0.25
       }
     }
   ]
