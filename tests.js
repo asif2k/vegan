@@ -550,7 +550,8 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           if (tree.frame_pending) {       // a species was just loaded: fit the camera to the new tree
             tree.frame_pending = false;
             engine.tra_model.set_position(scene.camera.control, 0, top * 0.45, 0);
-            scene.camera.control.distance = Math.max(10, top * 1.5);
+            scene.camera.control.distance = Math.max(10, top * parseFloat(url_params.get("zoomf") || "1.5"));
+            if (url_params.has("yaw") || url_params.has("pitch")) engine.tra_model.yaw_pitch(scene.camera.control, parseFloat(url_params.get("yaw") || "0"), parseFloat(url_params.get("pitch") || "0"));   // ?yaw= / ?pitch= (radians) to look from another side
           }
         }
 
@@ -943,7 +944,7 @@ void vertex(){
       // the camera along a path at eye height, ?lod=0 turns the LOD off to compare the cost.
       // =============================================================================================
       function forest_test() {
-        const WORLD = 130;                                // metres, a square centred on the origin
+        const WORLD = parseFloat(url_params.get("world") || "130");   // metres, a square centred on the origin (?world= for a smaller test area)
         const binders = { plant: make_plant_props(wa), rich: make_rich_plant_props(wa) };
         const tree_binder = make_tree_props(wa);
         const lod = scatter_lod.create(engine, { camera_position: scene.camera.world_position });
@@ -955,7 +956,8 @@ void vertex(){
         const fly = make_fly(3);
         const stats_div = dom.$.div({ $style: "color:white;padding:4px;font-size:90%;white-space:pre" });
 
-        const TREES = [["english_oak", 0.22], ["common_beech", 0.2], ["silver_birch", 0.18], ["scots_pine", 0.15], ["norway_spruce", 0.13], ["sugar_maple", 0.12]];
+        const TREES = url_params.has("species") ? [[url_params.get("species"), 1]]       // ?species=<tree id>: a stand of one species
+          : [["english_oak", 0.22], ["common_beech", 0.2], ["silver_birch", 0.18], ["scots_pine", 0.15], ["norway_spruce", 0.13], ["sugar_maple", 0.12]];
         // plants per square metre in the forest (the meadow densities are far too high to carry over 17,000 m^2)
         const UNDERGROWTH = { meadow_grass: 1.4, white_clover: 0.7, fern: 0.07, tussock_grass: 0.03, daisy: 0.1, dandelion: 0.06, poppy: 0.05, cornflower: 0.05, lavender: 0.015 };
 
@@ -1014,7 +1016,7 @@ void vertex(){
 
         scene.camera.control.distance = parseFloat(url_params.get("dist") || "5");
         engine.tra_model.set_position(scene.camera.control, 0, 1.35, 0);
-        engine.tra_model.yaw_pitch(scene.camera.control, parseFloat(url_params.get("yaw") || "0"), 0.1);
+        engine.tra_model.yaw_pitch(scene.camera.control, parseFloat(url_params.get("yaw") || "0"), parseFloat(url_params.get("pitch") || "0.1"));
 
         const scr = engine.deffered_rendering({
           camera: scene.camera,

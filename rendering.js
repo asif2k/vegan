@@ -1309,6 +1309,14 @@ void fragment(){
 discard;
 }
 `: `
+void vertex(){
+    super_vertex();
+    // "Pancaking": a caster in front of the cascade's near plane (the tip of a tall tree is much closer to the sun than the
+    // ground it shades, by height / sin(elevation), which is hundreds of metres for a low sun) would be clipped away and
+    // cast no shadow. Clamping its depth onto the near plane keeps it in the map; it is still nearer to the sun than every
+    // receiver behind it, which is all the depth compare needs.
+    gl_Position.z = max(gl_Position.z, -gl_Position.w);
+}
 void fragment(){
 #ifdef HAS_DISCARD
     has_discard();
@@ -1832,10 +1840,13 @@ void fragment(){
         engine.tra_model.set_rotation(scam.node, dlight0.world_rotation[0], dlight0.world_rotation[1], dlight0.world_rotation[2], dlight0.world_rotation[3]);
 
         
-        spos[0] = cam.world_position[0] + cam.fw_vector[0] * -(cascade.d * 1);
-        spos[1] = cam.world_position[1] + cam.fw_vector[1] * -(cascade.d * 1);
-        
-        spos[2] = cam.world_position[2] + cam.fw_vector[2] * -(cascade.d * 1);
+        // Centre the cascade on the camera. The lookup picks a cascade by the distance from the camera (u_cascade_splits = d)
+        // and treats anything outside that cascade's window as lit, so the window must contain every point within d of the
+        // camera whichever way it faces. It used to be centred d metres AHEAD of the camera, which left the ground beside and
+        // behind the camera (about half of it) outside the map: the long shadow of a tall tree simply stopped at the window edge.
+        spos[0] = cam.world_position[0];
+        spos[1] = cam.world_position[1];
+        spos[2] = cam.world_position[2];
 
         snap_to_shadow_texel(spos, scam.sd_vector, scam.up_vector, cascade.texel_size);
 
