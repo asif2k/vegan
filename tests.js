@@ -697,11 +697,43 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           return { geo: geo, total: total, inst: inst, count: 0 };
         }
 
+        // Aliasing of distant blades. A blade is a ribbon a few millimetres wide, so beyond a few metres it is much
+        // narrower than a pixel; the deferred pipeline has no MSAA, so a pixel either happens to catch a blade or
+        // misses it and the field turns into shimmering dots. The cure is to never let a ribbon get thinner than about
+        // a pixel: in the vertex shader each edge is pushed outwards by up to half a pixel, fading in with distance.
+        // plant_build_blade writes u = 0 for the left edge and u = 1 for the right, the width axis is always
+        // horizontal, and the front-face normal is width_axis x tangent, so up x normal points along the width axis
+        // (times the tangent's upward part). The 12 vertices of a blade segment are 6 front then 6 back-face ones
+        // (negated normals), hence the gl_VertexID test.
+        const BLADE_WIDEN_SHADER = `
+uniform vec2 u_render_size;
+uniform vec3 u_blade_widen;     // x: start distance, y: full-effect distance, z: strength in pixels (0 = off)
+void vertex(){
+	super_vertex();
+	if (u_blade_widen.z > 0.0 && u_projection_matrix[3][3] < 0.5) {      // perspective cameras only, not the sun's cascades
+		float side = v_uv.x * 2.0 - 1.0;                                  // -1 left edge ... +1 right edge
+		vec3 n = ((gl_VertexID % 12) >= 6) ? -v_normal_world : v_normal_world;
+		vec3 w = cross(vec3(0.0, 1.0, 0.0), n);
+		float wl = length(w);
+		if (wl > 1e-4) {
+			float depth = gl_Position.w;                                  // distance along the view axis
+			float pixel = depth * 2.0 / (u_projection_matrix[1][1] * u_render_size.y);   // world size of one pixel here
+			float fade = smoothstep(u_blade_widen.x, u_blade_widen.y, depth);
+			v_position_world += (w / wl) * (side * 0.5 * pixel * u_blade_widen.z * fade);
+			gl_Position = u_view_projection_matrix * vec4(v_position_world, 1.0);
+		}
+	}
+}`;
+        const plant_params = new URLSearchParams(location.search);
         const plant_mat = engine.materials.create({
           compiler: "pbr",
           props: { enable_vertex_color: true },
           state: { cullFace: null },                      // blades and petals are single ribbons: draw both faces
-          uniforms: { u_roughness: 0.8 },
+          shader: BLADE_WIDEN_SHADER,
+          uniforms: {
+            u_roughness: 0.8,
+            u_blade_widen: engine.math.vec3(3.0, 14.0, plant_params.has("widen") ? parseFloat(plant_params.get("widen")) : 1.0),
+          },
         });
         const ground_geo = engine.geometries.plane(40, 40, 1, 1, 2);   // last argument: 1 = XY (a wall), 2 = XZ (the ground)
         const ground_mat = engine.materials.create({
@@ -739,7 +771,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
 
         function build_habitat(h) {
           habitat = h;
-          scene.camera.control.distance = Math.max(2.5, h.size_m * 0.8);   // pull back to fit the habitat
+          scene.camera.control.distance = Math.max(2.5, h.size_m * (plant_params.has("zoom") ? parseFloat(plant_params.get("zoom")) : 0.8));   // pull back to fit the habitat
           engine.tra_model.set_position(scene.camera.control, 0, 0.25, 0);
           const rand = mulberry(7919 * scatter_seed);
           const lists = {};
@@ -775,7 +807,11 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
             oninput: function () { density_scale = parseFloat(this.value); build_habitat(habitat); },
           });
           const reseed = dom.$.button({ onclick: function () { scatter_seed++; build_habitat(habitat); } }, "scatter again");
-          dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px;color:white" }, habitat_select, "density ", density_slider, reseed, stats_div), dom.sidebar$.firstChild);
+          const widen_slider = dom.$.input({                  // how much distant blades are thickened (in pixels); 0 = off, shows the raw aliasing
+            type: "range", min: 0, max: 2, step: 0.05, value: plant_mat.uniforms.u_blade_widen[2], $style: "width:100%",
+            oninput: function () { plant_mat.uniforms.u_blade_widen[2] = parseFloat(this.value); },
+          });
+          dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px;color:white" }, habitat_select, "density ", density_slider, "distant blade widening ", widen_slider, reseed, stats_div), dom.sidebar$.firstChild);
           const want = (new URLSearchParams(location.search)).get("habitat");
           const found = Math.max(0, habitats.findIndex(function (h) { return h.id === want; }));
           habitat_select.value = found;
