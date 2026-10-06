@@ -2123,7 +2123,7 @@ function create_packing(root_url) {
 										console.log(source);
 										const hsource = hash_str(source);
 									
-										const file = "whashes\\" + hsource + ".js";
+										const file = "whashes/" + hsource + ".js";
 
 										get_file("/exist?" + file, "text").then(function (res) {
 											//console.log("wasms$", [file,res])
@@ -3295,7 +3295,9 @@ function create_packing(root_url) {
 					return function (req, res) {
 						req.on('end', function () {
 							try {
-								server.fs.writeFileSync(decodeURIComponent(req.search), req.body_buffer);
+								const put_file = decodeURIComponent(req.search);
+								server.fs.mkdirSync(require('path').dirname(put_file), { recursive: true });
+								server.fs.writeFileSync(put_file, req.body_buffer);
 								res.end("completed");
 							} catch (err) {
 								throw err;
