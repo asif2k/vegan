@@ -26,9 +26,10 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         "treeSteps", "segments", "levels",
         "rootFlare", "twigAngleJitter", "fruitClusterCount",
         "lengthJitter", "radiusJitter", "azimuthJitter", "elevationJitter",
+        "twigCards", "twigNormalBlend",
       ];
       const TREE_WHOLE_NUMBER_NAMES = [
-        "treeSteps", "segments", "levels", "fruitClusterCount",
+        "treeSteps", "segments", "levels", "fruitClusterCount", "twigCards",
       ];
       const TREE_COLOR_NAMES = ["barkColor", "fruitColor"];
 
@@ -96,7 +97,9 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           lengthJitter: { min: 0.0, max: 0.9, step: 0.01, desc: "Random length variation per branch (+/- fraction)", example: 0.0 },
           radiusJitter: { min: 0.0, max: 0.5, step: 0.01, desc: "Random thickness variation per side branch (+/- fraction)", example: 0.0 },
           azimuthJitter: { min: 0.0, max: 3.14, step: 0.01, desc: "Random extra turn of side limbs around the trunk (radians)", example: 0.0 },
-          elevationJitter: { min: 0.0, max: 1.5, step: 0.01, desc: "Random extra up/down tilt of side limbs", example: 0.0 }
+          elevationJitter: { min: 0.0, max: 1.5, step: 0.01, desc: "Random extra up/down tilt of side limbs", example: 0.0 },
+          twigCards: { min: 1, max: 4, step: 1, desc: "Leaf cards per twig, crossed around the branch (more = fluffier)", example: 1 },
+          twigNormalBlend: { min: 0.0, max: 1.0, step: 0.01, desc: "How much leaf normals lean out of the crown (0 = flat cards)", example: 0.0 }
         },
         plant_props: {
           bladeLength: { min: 0.01, max: 3.0, step: 0.01, desc: "Length of blade", example: 0.35 },
@@ -574,32 +577,16 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         // vertices (gg.trunk_count .. +gg.twig_count). Their UVs are meant for an alpha leaf texture and
         // their vertex colour is the bark colour, so they get their own material: the procedural leaf
         // texture (leaf_textures.js) as base colour, alpha-cut, no vertex colour.
-        const leaf_textures_cache = {};
-        function leaf_texture(id) {
-          if (!leaf_textures_cache[id]) {
-            const px = leaf_textures.pixels(id, 256);
-            // the canvas has v = 1 at the top row, GL uploads row 0 at v = 0: flip the rows
-            const flipped = new Uint8Array(px.data.length), stride = px.width * 4;
-            for (let y = 0; y < px.height; y++) flipped.set(px.data.subarray(y * stride, (y + 1) * stride), (px.height - 1 - y) * stride);
-            leaf_textures_cache[id] = engine.textures.create({ width: px.width, height: px.height, source: flipped, clamp: true });
-          }
-          return leaf_textures_cache[id];
-        }
-        const leaf_mat = engine.materials.create({
-          compiler: "pbr",
-          uniforms: {
-            u_base_color_map: leaf_texture("english_oak"),
-            u_alpha_test: 0.5,
-            u_roughness: 0.85,
-          }
-        });
+        const leaf_mat = make_leaf_material("english_oak");   // shared foliage material (see LEAF_SHADER)
         tree.show_twigs = true;
 
         // ---- species catalog (tree_trunk_presets.json): pick one to load its props, leaf texture and seed
         function apply_species(sp) {
           tree.apply_preset(0);
           Object.keys(sp.props).forEach(function (k) { tree[k] = sp.props[k]; });
-          leaf_mat.uniforms.u_base_color_map = leaf_texture(sp.leaf_texture);
+          if (url_params.has("cards")) tree.twigCards = parseFloat(url_params.get("cards"));        // ?cards= / ?blend= override the catalog values
+          if (url_params.has("blend")) tree.twigNormalBlend = parseFloat(url_params.get("blend"));
+          leaf_mat.uniforms.u_base_color_map = leaf_texture_for(sp.leaf_texture);
           tree.ui_updaters.forEach(function (fn) { fn(); });
           tree.needs_update = true;
           tree.frame_pending = true;
@@ -649,9 +636,11 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           render_scene();
         };
         scr.on_frame = function (time, time_delta) {
+          wind_tick();
           engine.debug.grid.render_plane();
           render_scene();
         };
+        wind_controls();
 
 
 
@@ -679,6 +668,77 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         if (seed !== undefined) binder.seed = seed;
       }
 
+      const url_params = new URLSearchParams(location.search);
+
+      // ---- wind: one global uniform shared by the foliage and grass shaders, u_wind = (direction x, direction z, time in seconds, strength).
+      // ?wind=<strength> (0 = still air), ?wt=<seconds> freezes the time (for comparing two moments).
+      const wind = new Float32Array([0.8, 0.6, 0, url_params.has("wind") ? parseFloat(url_params.get("wind")) : 0.7]);
+      engine.uniforms.set("u_wind", wind);
+      const wind_t0 = performance.now();
+      function wind_tick() { wind[2] = url_params.has("wt") ? parseFloat(url_params.get("wt")) : (performance.now() - wind_t0) / 1000; }
+      function wind_controls() {
+        const strength = dom.$.input({ type: "range", min: 0, max: 2, step: 0.05, value: wind[3], $style: "width:100%", oninput: function () { wind[3] = parseFloat(this.value); } });
+        const heading = dom.$.input({ type: "range", min: 0, max: 6.283, step: 0.05, value: Math.atan2(wind[1], wind[0]), $style: "width:100%", oninput: function () { wind[0] = Math.cos(this.value); wind[1] = Math.sin(this.value); } });
+        dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px;color:white" }, "wind strength ", strength, "wind direction ", heading), dom.sidebar$.firstChild);
+      }
+
+      // ---- foliage. A twig is a few alpha-textured cards (twigCards, crossed around the branch). What makes them read as leaves and not
+      // as cards, in this material:
+      //  * normals: tree_generate leans every card normal out of the crown (twigNormalBlend), so a cluster shades like one soft volume
+      //  * edges: the texture alpha is hashed against a per-pixel noise value instead of cut at 0.5, so the outline is ragged and,
+      //    with TAA, accumulates into soft partial coverage (the shadow pass still cuts at 0.5)
+      //  * colour: each card is tinted a little differently (the per-twig phase tree_generate stores in the vertex colour alpha) and is
+      //    darker towards the branch (inside the crown) than at its tip, which gives the canopy depth
+      //  * light: a little translucency, so leaves glow slightly where the sun comes through
+      //  * motion: gusts travel through the canopy as a wave along the wind direction; each cluster sways with the gust, and every card
+      //    flutters faster in a gust, both more towards the card tip (uv.y = 1) than at the branch (uv.y = 0)
+      // (the engine builds a material's vertex and fragment stages from one string: everything up to the end of vertex() is the vertex
+      // stage and the rest the fragment stage, or split it explicitly at [fragment-shader]; each stage declares what it uses)
+      const LEAF_SHADER = `
+uniform vec4 u_wind;           // wind direction (.xy), time in seconds (.z), strength (.w)
+uniform vec4 u_leaf_params;    // x: sway (m), y: flutter (m), z: tint variation, w: translucency
+void vertex(){
+	super_vertex();
+	if (u_wind.w > 0.0 && u_projection_matrix[3][3] < 2.0) {
+		float phase = a_color.a;
+		float tip = smoothstep(0.0, 1.0, v_uv.y);
+		vec2 dir = normalize(u_wind.xy + vec2(1e-5));
+		float t = u_wind.z;
+		float gust = sin(dot(v_position_world.xz, dir) * 0.16 - t * 1.6) * 0.5 + 0.5;               // a wave travelling through the forest
+		vec3 sway = vec3(dir.x, 0.0, dir.y) * (0.25 + 0.75 * gust) * u_leaf_params.x * tip;
+		sway.y += sin(t * 1.3 + phase) * 0.35 * u_leaf_params.x * tip;
+		vec3 shiver = vec3(sin(phase * 3.1), cos(phase * 2.3), sin(phase * 1.7 + 1.0));              // a different direction for every cluster
+		float flutter = sin(t * (5.0 + 6.0 * gust) + phase * 4.0 + dot(v_position_world, vec3(0.9, 0.7, 1.1))) * u_leaf_params.y * (0.3 + 0.7 * gust) * tip;
+		v_position_world += (sway + shiver * flutter) * u_wind.w;
+		gl_Position = u_view_projection_matrix * vec4(v_position_world, 1.0);
+	}
+}
+[fragment-shader]
+uniform vec4 u_leaf_params;
+float leaf_hash(vec2 p) {
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
+}
+void resolve_shading_attributes(inout Material mat){
+	super_resolve_shading_attributes(mat);
+	vec4 texel = texture2D(u_base_color_map, mat.uv);
+	float phase = v_color.a;
+	float tint = 1.0 + (fract(phase * 0.3183 + 0.37) - 0.5) * 2.0 * u_leaf_params.z;
+	vec3 col = texel.rgb * tint * mix(0.70, 1.12, smoothstep(0.05, 0.9, mat.uv.y));
+	mat.base_color = vec4(col, step(leaf_hash(gl_FragCoord.xy), smoothstep(0.15, 0.85, texel.a)));
+	mat.roughness = 0.82;
+	mat.emissive_color += col * u_leaf_params.w;
+}`;
+      function make_leaf_material(id) {
+        return engine.materials.create({
+          compiler: "pbr",
+          props: { enable_vertex_color: true },        // only for the phase in the alpha: the shader replaces the (bark) colour
+          shader: LEAF_SHADER,
+          uniforms: { u_base_color_map: leaf_texture_for(id), u_alpha_test: 0.5, u_roughness: 0.82, u_leaf_params: engine.math.vec4(0.22, 0.05, 0.16, 0.10) },
+        });
+      }
+
       // Aliasing of distant blades. A blade is a ribbon a few millimetres wide, so beyond a few metres it is much
       // narrower than a pixel and the field turns into shimmering dots. In the vertex shader each edge is pushed outwards
       // by up to half a pixel, fading in with distance, so a ribbon never gets thinner than about a pixel.
@@ -688,8 +748,21 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
       const BLADE_WIDEN_SHADER = `
 uniform vec2 u_render_size;
 uniform vec3 u_blade_widen;     // x: start distance, y: full-effect distance, z: strength in pixels (0 = off)
+uniform vec4 u_wind;            // see wind: direction (.xy), time (.z), strength (.w)
 void vertex(){
 	super_vertex();
+	if (u_wind.w > 0.0) {                               // (also in the shadow pass, so the shadows move with the blades)
+		// grass bends in the wind: the tip (blade-local height^2) moves most, gusts travel across the field as a wave, and every
+		// plant (its instance position) has its own phase so the field ripples instead of moving as one
+		float h = max(v_a_position.y, 0.0);
+		vec2 dir = normalize(u_wind.xy + vec2(1e-5));
+		vec3 ip = a_instance_a_position;
+		float gust = sin(dot(ip.xz, dir) * 0.35 - u_wind.z * 1.9) * 0.5 + 0.5;
+		float own = sin(u_wind.z * 2.4 + ip.x * 1.7 + ip.z * 2.9);
+		vec3 bend = vec3(dir.x, 0.0, dir.y) * (0.06 + 0.2 * gust) + vec3(own * 0.05, 0.0, own * 0.03);
+		v_position_world += bend * (h * h) * u_wind.w;
+		gl_Position = u_view_projection_matrix * vec4(v_position_world, 1.0);
+	}
 	if (u_blade_widen.z > 0.0 && u_projection_matrix[3][3] < 0.5) {      // perspective cameras only, not the sun's cascades
 		float side = v_uv.x * 2.0 - 1.0;                                  // -1 left edge ... +1 right edge
 		vec3 n = ((gl_VertexID % 12) >= 6) ? -v_normal_world : v_normal_world;
@@ -704,7 +777,6 @@ void vertex(){
 		}
 	}
 }`;
-      const url_params = new URLSearchParams(location.search);
       function make_plant_material() {
         return engine.materials.create({
           compiler: "pbr",
@@ -788,7 +860,7 @@ void vertex(){
         const p = Object.assign({}, sp.props);
         if (level === 0) return p;
         p.segments = level === 1 ? Math.max(4, 2 * Math.round((p.segments - 2) / 2)) : 4;
-        if (level === 2) { p.levels = Math.max(3, p.levels - 1); p.twigScale *= 1.25; }
+        if (level === 2) { p.levels = Math.max(3, p.levels - 1); p.twigScale *= 1.25; p.twigCards = Math.max(1, Math.round(p.twigCards || 1) - 1); }   // one branch level and one card fewer, bigger cards
         return p;
       }
 
@@ -819,10 +891,6 @@ void vertex(){
         }
         return leaf_texture_cache[id];
       }
-      function make_leaf_material(id) {
-        return engine.materials.create({ compiler: "pbr", uniforms: { u_base_color_map: leaf_texture_for(id), u_alpha_test: 0.5, u_roughness: 0.85 } });
-      }
-
       // text for the LOD statistics: instances drawn per level, per group
       function lod_stats_text(lod) {
         const st = lod.stats, groups = {};
@@ -930,12 +998,14 @@ void vertex(){
         antialias_controls(scr);
         scr.on_shadowmap = function (time, time_delta) { lod.render("shadow"); };
         scr.on_frame = function (time, time_delta) {
+          wind_tick();
           lod.update();
           stats_div.textContent = lod_stats_text(lod);
           ground.render();
           lod.render("main");
           engine.debug.render();
         };
+        wind_controls();
       }
 
       // =============================================================================================
@@ -1027,7 +1097,9 @@ void vertex(){
         });
         antialias_controls(scr);
         scr.on_shadowmap = function (time, time_delta) { lod.render("shadow"); };
+        wind_controls();
         scr.on_frame = function (time, time_delta) {
+          wind_tick();
           fly.step();
           lod.update();
           stats_div.textContent = lod_stats_text(lod);

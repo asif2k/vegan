@@ -1,9 +1,9 @@
 {
   "format": "vegan tree_props presets",
   "notes": [
-    "Each \"props\" object has all 41 tree_props fields, named and ordered exactly as the C++ struct in tree_system.cpp (and TREE_PROP_NAMES in tests.js), so it can be assigned straight onto the tree props object: for (k in props) tree[k] = props[k]; tree.needs_update = true.",
+    "Each \"props\" object has all 43 tree_props fields, named and ordered exactly as the C++ struct in tree_system.cpp (and TREE_PROP_NAMES in tests.js), so it can be assigned straight onto the tree props object: for (k in props) tree[k] = props[k]; tree.needs_update = true.",
     "Units: 1 unit ~ 1 m. The coast redwood is scaled down, and all values stay inside the tests.js slider ranges. The stored seed is a typical-looking one; other seeds give natural variation (see generated.height_over_seeds_1_to_12) because lengthJitter, radiusJitter, azimuthJitter and elevationJitter are non-zero.",
-    "leaf_texture is the id to pass to leaf_textures.create()/pixels() (leaf_textures.js): twig cards are alpha-cut leaf textures and tree_generate colours them with the bark colour, so draw them with a material that does not use vertex colour. Requires the 41-prop tree_system.cpp (the four jitter props are the last four fields); set them to 0 for the old, regular branching."
+    "leaf_texture is the id to pass to leaf_textures.create()/pixels() (leaf_textures.js): twig cards are alpha-cut leaf textures and tree_generate colours them with the bark colour, so draw them with a material that does not use vertex colour. Requires the 43-prop tree_system.cpp (the last six fields are the jitter props, twigCards and twigNormalBlend). twigCards and twigNormalBlend give foliage volume (crossed cards, normals leaning out of the crown); set them to 1 and 0 for the old flat cards. All the *Jitter props can be set to 0 for the old, regular branching."
   ],
   "prop_order": [
     "clumpMax",
@@ -46,7 +46,9 @@
     "lengthJitter",
     "radiusJitter",
     "azimuthJitter",
-    "elevationJitter"
+    "elevationJitter",
+    "twigCards",
+    "twigNormalBlend"
   ],
   "trees": [
     {
@@ -64,7 +66,7 @@
         "dbh": 1.15,
         "crown_width": 23.7,
         "woody_vertices": 6864,
-        "twig_cards": 96,
+        "twig_cards": 288,
         "height_over_seeds_1_to_12": [
           17.2,
           28.6
@@ -111,7 +113,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 1,
-        "elevationJitter": 0.35
+        "elevationJitter": 0.35,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -129,7 +133,7 @@
         "dbh": 0.53,
         "crown_width": 6.4,
         "woody_vertices": 5136,
-        "twig_cards": 72,
+        "twig_cards": 216,
         "height_over_seeds_1_to_12": [
           22.5,
           28.6
@@ -176,7 +180,9 @@
         "lengthJitter": 0.2,
         "radiusJitter": 0.1,
         "azimuthJitter": 0.4,
-        "elevationJitter": 0.15
+        "elevationJitter": 0.15,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -194,7 +200,7 @@
         "dbh": 0.23,
         "crown_width": 5.2,
         "woody_vertices": 9168,
-        "twig_cards": 128,
+        "twig_cards": 384,
         "height_over_seeds_1_to_12": [
           12.1,
           18.2
@@ -241,7 +247,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.8,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -259,7 +267,7 @@
         "dbh": 0.35,
         "crown_width": 1.8,
         "woody_vertices": 6288,
-        "twig_cards": 88,
+        "twig_cards": 264,
         "height_over_seeds_1_to_12": [
           19.4,
           21.2
@@ -306,7 +314,9 @@
         "lengthJitter": 0.15,
         "radiusJitter": 0.1,
         "azimuthJitter": 0.5,
-        "elevationJitter": 0.1
+        "elevationJitter": 0.1,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -324,7 +334,7 @@
         "dbh": 2.84,
         "crown_width": 6.5,
         "woody_vertices": 6288,
-        "twig_cards": 88,
+        "twig_cards": 264,
         "height_over_seeds_1_to_12": [
           39.4,
           44.8
@@ -371,7 +381,9 @@
         "lengthJitter": 0.25,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.6,
-        "elevationJitter": 0.2
+        "elevationJitter": 0.2,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -389,7 +401,7 @@
         "dbh": 4.2,
         "crown_width": 9.8,
         "woody_vertices": 8568,
-        "twig_cards": 80,
+        "twig_cards": 240,
         "height_over_seeds_1_to_12": [
           14.3,
           20.6
@@ -436,7 +448,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.2,
         "azimuthJitter": 1,
-        "elevationJitter": 0.35
+        "elevationJitter": 0.35,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -454,7 +468,7 @@
         "dbh": 1.1,
         "crown_width": 16.6,
         "woody_vertices": 5712,
-        "twig_cards": 80,
+        "twig_cards": 240,
         "height_over_seeds_1_to_12": [
           12.4,
           20.5
@@ -501,7 +515,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 1,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -519,7 +535,7 @@
         "dbh": 0.48,
         "crown_width": 6.9,
         "woody_vertices": 8580,
-        "twig_cards": 96,
+        "twig_cards": 288,
         "height_over_seeds_1_to_12": [
           5.7,
           10.9
@@ -566,7 +582,9 @@
         "lengthJitter": 0.4,
         "radiusJitter": 0.2,
         "azimuthJitter": 1.4,
-        "elevationJitter": 0.5
+        "elevationJitter": 0.5,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -584,7 +602,7 @@
         "dbh": 0.66,
         "crown_width": 14.2,
         "woody_vertices": 9168,
-        "twig_cards": 128,
+        "twig_cards": 384,
         "height_over_seeds_1_to_12": [
           16.7,
           33.2
@@ -631,7 +649,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.9,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -649,7 +669,7 @@
         "dbh": 0.3,
         "crown_width": 6,
         "woody_vertices": 9168,
-        "twig_cards": 128,
+        "twig_cards": 384,
         "height_over_seeds_1_to_12": [
           16.8,
           23.2
@@ -696,7 +716,9 @@
         "lengthJitter": 0.25,
         "radiusJitter": 0.1,
         "azimuthJitter": 0.6,
-        "elevationJitter": 0.25
+        "elevationJitter": 0.25,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -714,7 +736,7 @@
         "dbh": 1,
         "crown_width": 24.9,
         "woody_vertices": 8016,
-        "twig_cards": 112,
+        "twig_cards": 336,
         "height_over_seeds_1_to_12": [
           19.3,
           39.9
@@ -761,7 +783,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.9,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -779,7 +803,7 @@
         "dbh": 0.74,
         "crown_width": 12,
         "woody_vertices": 6864,
-        "twig_cards": 96,
+        "twig_cards": 288,
         "height_over_seeds_1_to_12": [
           28.4,
           31.2
@@ -826,7 +850,9 @@
         "lengthJitter": 0.15,
         "radiusJitter": 0.1,
         "azimuthJitter": 0.5,
-        "elevationJitter": 0.15
+        "elevationJitter": 0.15,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -844,7 +870,7 @@
         "dbh": 0.74,
         "crown_width": 3.8,
         "woody_vertices": 6288,
-        "twig_cards": 88,
+        "twig_cards": 264,
         "height_over_seeds_1_to_12": [
           27.6,
           31.7
@@ -891,7 +917,9 @@
         "lengthJitter": 0.2,
         "radiusJitter": 0.1,
         "azimuthJitter": 0.6,
-        "elevationJitter": 0.1
+        "elevationJitter": 0.1,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -909,7 +937,7 @@
         "dbh": 0.45,
         "crown_width": 17.7,
         "woody_vertices": 2256,
-        "twig_cards": 32,
+        "twig_cards": 96,
         "height_over_seeds_1_to_12": [
           8,
           13.3
@@ -956,7 +984,9 @@
         "lengthJitter": 0.25,
         "radiusJitter": 0.15,
         "azimuthJitter": 1,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -974,7 +1004,7 @@
         "dbh": 0.33,
         "crown_width": 8.1,
         "woody_vertices": 1392,
-        "twig_cards": 20,
+        "twig_cards": 40,
         "height_over_seeds_1_to_12": [
           12.9,
           16.6
@@ -1021,7 +1051,9 @@
         "lengthJitter": 0.15,
         "radiusJitter": 0.1,
         "azimuthJitter": 1.2,
-        "elevationJitter": 0.2
+        "elevationJitter": 0.2,
+        "twigCards": 2,
+        "twigNormalBlend": 0.5
       }
     },
     {
@@ -1039,7 +1071,7 @@
         "dbh": 0.4,
         "crown_width": 13.4,
         "woody_vertices": 5712,
-        "twig_cards": 80,
+        "twig_cards": 240,
         "height_over_seeds_1_to_12": [
           7.7,
           13.5
@@ -1086,7 +1118,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 1,
-        "elevationJitter": 0.35
+        "elevationJitter": 0.35,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -1104,7 +1138,7 @@
         "dbh": 1.1,
         "crown_width": 16,
         "woody_vertices": 5712,
-        "twig_cards": 80,
+        "twig_cards": 240,
         "height_over_seeds_1_to_12": [
           30.8,
           45.1
@@ -1151,7 +1185,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.8,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -1169,7 +1205,7 @@
         "dbh": 1.58,
         "crown_width": 32.3,
         "woody_vertices": 6864,
-        "twig_cards": 96,
+        "twig_cards": 288,
         "height_over_seeds_1_to_12": [
           17.8,
           29.7
@@ -1216,7 +1252,9 @@
         "lengthJitter": 0.25,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.8,
-        "elevationJitter": 0.15
+        "elevationJitter": 0.15,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -1234,7 +1272,7 @@
         "dbh": 0.72,
         "crown_width": 9.1,
         "woody_vertices": 9168,
-        "twig_cards": 128,
+        "twig_cards": 384,
         "height_over_seeds_1_to_12": [
           17.8,
           30.2
@@ -1281,7 +1319,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.9,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -1299,7 +1339,7 @@
         "dbh": 1.19,
         "crown_width": 29.6,
         "woody_vertices": 8016,
-        "twig_cards": 112,
+        "twig_cards": 336,
         "height_over_seeds_1_to_12": [
           19.1,
           39.9
@@ -1346,7 +1386,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.9,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -1364,7 +1406,7 @@
         "dbh": 0.2,
         "crown_width": 7.3,
         "woody_vertices": 5712,
-        "twig_cards": 80,
+        "twig_cards": 240,
         "height_over_seeds_1_to_12": [
           4.8,
           8.1
@@ -1411,7 +1453,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 1,
-        "elevationJitter": 0.35
+        "elevationJitter": 0.35,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -1429,7 +1473,7 @@
         "dbh": 0.78,
         "crown_width": 13.1,
         "woody_vertices": 2832,
-        "twig_cards": 40,
+        "twig_cards": 120,
         "height_over_seeds_1_to_12": [
           15.7,
           21.7
@@ -1476,7 +1520,9 @@
         "lengthJitter": 0.25,
         "radiusJitter": 0.15,
         "azimuthJitter": 0.8,
-        "elevationJitter": 0.25
+        "elevationJitter": 0.25,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -1494,7 +1540,7 @@
         "dbh": 1.39,
         "crown_width": 31.2,
         "woody_vertices": 5712,
-        "twig_cards": 80,
+        "twig_cards": 240,
         "height_over_seeds_1_to_12": [
           13.5,
           24.6
@@ -1541,7 +1587,9 @@
         "lengthJitter": 0.3,
         "radiusJitter": 0.15,
         "azimuthJitter": 1,
-        "elevationJitter": 0.3
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     },
     {
@@ -1559,7 +1607,7 @@
         "dbh": 0.63,
         "crown_width": 13.8,
         "woody_vertices": 6288,
-        "twig_cards": 88,
+        "twig_cards": 264,
         "height_over_seeds_1_to_12": [
           26.6,
           33.1
@@ -1606,7 +1654,9 @@
         "lengthJitter": 0.25,
         "radiusJitter": 0.12,
         "azimuthJitter": 0.7,
-        "elevationJitter": 0.2
+        "elevationJitter": 0.2,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
       }
     }
   ]

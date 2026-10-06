@@ -21,7 +21,7 @@
 #define TREE_PRESET_COUNT   1
 #define TREE_FRUIT_VERTS_PER_UNIT 156 // 6x5 UV-sphere (144 verts) + 12-vert stem quad
 
-#define TREE_PROPS_COUNT 41
+#define TREE_PROPS_COUNT 43
 
 
 
@@ -87,6 +87,10 @@ struct tree_props {
     number radiusJitter;      // 0..0.5  fractional +/- spread of each side branch's radius
     number azimuthJitter;     // radians, random extra turn of a side limb around its parent
     number elevationJitter;   // random extra up/down tilt of a side limb (a direction offset, ~0..1)
+    // ---- foliage volume (defaults reproduce the old single flat card per twig exactly) ----
+    number twigCards;         // 1..4  cards per twig, crossed around the branch axis like a star, so the cluster has volume
+    number twigNormalBlend;   // 0..1  0 = each card shades with its own face normal; 1 = every vertex's normal points away
+                              //       from the middle of the crown, so foliage shades like a soft volume instead of flat cards
 };
 
 struct tree_branch {
@@ -140,6 +144,8 @@ static void tree_props_set_default(tree_props* p) {
     p->radiusJitter = 0.0f;
     p->azimuthJitter = 0.0f;
     p->elevationJitter = 0.0f;
+    p->twigCards = 1.0f;
+    p->twigNormalBlend = 0.0f;
 }
 
 // Species are defined entirely in species_catalog_2.json now -- this is the only
@@ -181,6 +187,10 @@ static inline void tree_props_clamp(tree_props* p) {
     if (p->azimuthJitter > 3.14f) p->azimuthJitter = 3.14f;
     if (p->elevationJitter < 0.0f) p->elevationJitter = 0.0f;
     if (p->elevationJitter > 1.5f) p->elevationJitter = 1.5f;
+    if (p->twigCards < 1.0f) p->twigCards = 1.0f;
+    if (p->twigCards > 4.0f) p->twigCards = 4.0f;
+    if (p->twigNormalBlend < 0.0f) p->twigNormalBlend = 0.0f;
+    if (p->twigNormalBlend > 1.0f) p->twigNormalBlend = 1.0f;
 }
 
 // ----------------------------------------------------------------------------
@@ -445,7 +455,8 @@ WASM_EXPORT uint32_t tree_estimate_max_verts(tree_props* props) {
     if (branch_count > TREE_MAX_BRANCHES) branch_count = TREE_MAX_BRANCHES;
     uint32_t trunk_est = branch_count * segments * 6;
     uint32_t fruit_unit = (props->fruitChance > 0.0f) ? (fruitClusterCount * TREE_FRUIT_VERTS_PER_UNIT) : 0u;
-    uint32_t twig_unit = fruit_unit > 12u ? fruit_unit : 12u;
+    uint32_t card_unit = 12u * (uint32_t)props->twigCards;
+    uint32_t twig_unit = fruit_unit > card_unit ? fruit_unit : card_unit;
 
     return trunk_est + branch_count * twig_unit;
 }
@@ -861,6 +872,24 @@ static uint32_t tree_build_twigs(tree_props* props, tree_branch* branches, int32
                                    uint32_t out_offset, uint32_t max_verts) {
     uint32_t o = out_offset;
     uint32_t fruitClusterMax = (uint32_t)props->fruitClusterCount;
+    uint32_t cards = (uint32_t)props->twigCards;
+    if (cards < 1u) cards = 1u;
+    number blend = props->twigNormalBlend;
+
+    // Middle of the foliage (the mean of the twig tips). With twigNormalBlend > 0 the normals of the cards lean away from
+    // it: a flat card lit by its own face normal reads as a flat card, while normals that point out of the crown make a
+    // cluster of cards shade like one soft rounded mass of leaves (the same trick as spherical-normal tree impostors).
+    number crown[3] = { 0.0f, 0.0f, 0.0f };
+    if (blend > 0.0f) {
+        int32_t n_tips = 0;
+        for (int32_t bi = 0; bi < branch_count; bi++) {
+            tree_branch* b = &branches[bi];
+            if (b->child0 >= 0 || b->parent < 0) continue;
+            crown[0] += b->head[0]; crown[1] += b->head[1]; crown[2] += b->head[2];
+            n_tips++;
+        }
+        if (n_tips > 0) { crown[0] /= (number)n_tips; crown[1] /= (number)n_tips; crown[2] /= (number)n_tips; }
+    }
 
     auto emit_double_quad = [&](const number* tp_, const number* tn_, const number* bn_, const number* bp_, const number* color) {
         number e1[3]; v3_sub(e1, tp_, bn_);
@@ -868,8 +897,16 @@ static uint32_t tree_build_twigs(tree_props* props, tree_branch* branches, int32
         number normal[3]; v3_cross(normal, e1, e2); v3_normalize(normal, normal);
         number normal2[3]; v3_scale(normal2, normal, -1.0f);
         auto emit = [&](const number* pos, const number* n, number u, number v) {
+            number nb[3] = { n[0], n[1], n[2] };
+            if (blend > 0.0f) {
+                number radial[3]; v3_sub(radial, pos, crown); v3_normalize(radial, radial);
+                nb[0] = n[0] * (1.0f - blend) + radial[0] * blend;
+                nb[1] = n[1] * (1.0f - blend) + radial[1] * blend;
+                nb[2] = n[2] * (1.0f - blend) + radial[2] * blend;
+                v3_normalize(nb, nb);
+            }
             out_positions[o * 3 + 0] = pos[0]; out_positions[o * 3 + 1] = pos[1]; out_positions[o * 3 + 2] = pos[2];
-            out_normals[o * 3 + 0] = n[0]; out_normals[o * 3 + 1] = n[1]; out_normals[o * 3 + 2] = n[2];
+            out_normals[o * 3 + 0] = nb[0]; out_normals[o * 3 + 1] = nb[1]; out_normals[o * 3 + 2] = nb[2];
             out_uvs[o * 2 + 0] = u; out_uvs[o * 2 + 1] = v;
             out_colors[o * 4 + 0] = color[0]; out_colors[o * 4 + 1] = color[1]; out_colors[o * 4 + 2] = color[2]; out_colors[o * 4 + 3] = color[3];
             o++;
@@ -975,14 +1012,16 @@ static uint32_t tree_build_twigs(tree_props* props, tree_branch* branches, int32
             continue;
         }
 
-        uint32_t need = 12u;
+        uint32_t need = 12u * cards;
         if (o + need > max_verts) { print("tree_build_twigs: output overflow, truncating"); break; }
 
         number bark_color[4] = {
             veg_clamp01(props->barkColor[0] + (veg_rand3((number)bi, 55.0f, 0.0f, props->seed) * 2.0f - 1.0f) * props->barkColorVariance),
             veg_clamp01(props->barkColor[1] + (veg_rand3((number)bi, 56.0f, 0.0f, props->seed) * 2.0f - 1.0f) * props->barkColorVariance),
             veg_clamp01(props->barkColor[2] + (veg_rand3((number)bi, 57.0f, 0.0f, props->seed) * 2.0f - 1.0f) * props->barkColorVariance),
-            1.0f,
+            // alpha carries a per-twig wind phase in [0, 2 pi) (as plant_system.cpp does for blades), not opacity: it lets a
+            // foliage shader sway every cluster out of step with its neighbours and tint each one a little differently
+            veg_rand3((number)bi, 78.0f, 0.0f, props->seed) * TWO_PI_F,
         };
 
         number t1[3]; v3_sub(t1, branches[p->child0].head, p->head);
@@ -1001,12 +1040,18 @@ static uint32_t tree_build_twigs(tree_props* props, tree_branch* branches, int32
         v3_scale(bot, binormal, -b->length); v3_add(bot, b->head, bot);
 
         number half_width = props->twigScale; // 1:1 default ratio
-        number l1[3] = { bot[0] - tangent[0] * half_width, bot[1] - tangent[1] * half_width, bot[2] - tangent[2] * half_width };
-        number r1[3] = { bot[0] + tangent[0] * half_width, bot[1] + tangent[1] * half_width, bot[2] + tangent[2] * half_width };
-        number l2[3] = { top[0] - tangent[0] * half_width, top[1] - tangent[1] * half_width, top[2] - tangent[2] * half_width };
-        number r2[3] = { top[0] + tangent[0] * half_width, top[1] + tangent[1] * half_width, top[2] + tangent[2] * half_width };
-        
-        emit_double_quad(r2, l2, l1, r1, bark_color);
+        // twigCards cards per twig, all containing the branch axis and spread evenly around it (a star seen along the axis):
+        // from any direction one of them is close to face-on, and together they read as a clump with depth, not a card
+        for (uint32_t ci = 0; ci < cards; ci++) {
+            number ct[3];
+            if (ci == 0) v3_copy(ct, tangent);
+            else { tree_axis_angle(ct, tangent, binormal, (number)ci * 3.14159265f / (number)cards); v3_normalize(ct, ct); }
+            number l1[3] = { bot[0] - ct[0] * half_width, bot[1] - ct[1] * half_width, bot[2] - ct[2] * half_width };
+            number r1[3] = { bot[0] + ct[0] * half_width, bot[1] + ct[1] * half_width, bot[2] + ct[2] * half_width };
+            number l2[3] = { top[0] - ct[0] * half_width, top[1] - ct[1] * half_width, top[2] - ct[2] * half_width };
+            number r2[3] = { top[0] + ct[0] * half_width, top[1] + ct[1] * half_width, top[2] + ct[2] * half_width };
+            emit_double_quad(r2, l2, l1, r1, bark_color);
+        }
     }
 
     return o - out_offset;

@@ -169,9 +169,23 @@ const leaf_textures = (function () {
         else { g.fillStyle = shade([86, 130, 60], p.k); g.beginPath(); SHAPES.ovate(g); g.fill(); }
       }
       else {
+        // a blade is lit from one side: lighter on one half, darker on the other, which is what makes a flat shape read as a leaf
+        const half = spec.kind === 'narrow' ? 0.12 : 0.34;
+        const grad = g.createLinearGradient(0, -half, 0, half);
+        grad.addColorStop(0, shade(spec.color, p.k * 1.14));
+        grad.addColorStop(0.5, shade(spec.color, p.k));
+        grad.addColorStop(1, shade(spec.color, p.k * 0.78));
+        g.fillStyle = grad;
         g.beginPath(); SHAPES[spec.kind](g); g.fill();
+        g.lineWidth = 0.02; g.strokeStyle = shade(spec.color, p.k * 0.55);   // edge: a slightly darker rim separates overlapping leaves
+        g.globalAlpha = 0.5; g.stroke(); g.globalAlpha = 1;
         g.lineWidth = 0.025; g.strokeStyle = shade(spec.color, p.k * 0.62);   // midrib
         g.beginPath(); g.moveTo(0, 0); g.lineTo(0.9, 0); g.stroke();
+        if (spec.kind === 'ovate' || spec.kind === 'round' || spec.kind === 'lobed') {   // side veins
+          g.lineWidth = 0.012; g.globalAlpha = 0.55;
+          for (let vi = 1; vi <= 3; vi++) { const t = vi * 0.2; for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(t, 0); g.lineTo(t + 0.17, sd * 0.2); g.stroke(); } }
+          g.globalAlpha = 1;
+        }
       }
       g.restore();
     });
