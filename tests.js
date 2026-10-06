@@ -1,5 +1,6 @@
 packing("engine.js","debug.js")(function (engine, dom, httprequest) {
   import("leaf_textures.js")
+  import("scatter_lod.js")
 
   function ready(engine) {
 
@@ -657,68 +658,33 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
 
 
 
-      // ---------------------------------------------------------------------------------------------
-      // plants and grass (plant_system.cpp), loaded with  ?scene=plants[&habitat=<id>]
-      //
-      // plant_generate makes blade plants (grass, rosettes, ferns) and rich_plant_generate makes a stem with
-      // leaves and a flower. plant_presets.json holds a catalog of both; every plant is generated with a few
-      // seeds, uploaded once as an engine geometry, and then scattered over a habitat with instancing: the
-      // geometry holds one plant and a per-instance position attribute (divisor 1) places the copies.
-      function plants_test() {
-        const plant_binder = make_plant_props(wa);        // flat float-block binders over the C++ structs (also give the sliders)
-        const rich_binder = make_rich_plant_props(wa);
+      // =============================================================================================
+      // shared by the plants and forest scenes: generation scratch buffers, LOD derivation, kind builders
+      // =============================================================================================
 
-        // plant_estimate_max_verts ignores the flower / ear geometry that flowerChance adds, so don't size from it
-        const MAX_VERTS = 60000;
-        const positions = wa.fp32_array(MAX_VERTS * 3);
-        const normals = wa.fp32_array(MAX_VERTS * 3);
-        const uvs = wa.fp32_array(MAX_VERTS * 2);
-        const colors = wa.fp32_array(MAX_VERTS * 4);
-        const counts = wa.u32_array(2);                   // rich_plant_generate: stem verts, leaf verts
-        const VARIANTS = 4;                               // seeds per plant: the copies of one species are not clones
-        const DYNAMIC_DRAW = 35048;                       // GL_DYNAMIC_DRAW
-        const library = {};                               // plant id -> { def, variants: [{ geo, total, inst, count }] }
-
-        function upload_plant(def, seed) {
-          const binder = def.generator === "rich" ? rich_binder : plant_binder;
-          binder.apply_preset(0);
-          Object.keys(def.props).forEach(function (k) { binder[k] = def.props[k]; });
-          binder.seed = seed;
-          const total = def.generator === "rich"
-            ? wa.rich_plant_generate(binder.ptr, positions.byteOffset, normals.byteOffset, uvs.byteOffset, colors.byteOffset, MAX_VERTS, counts.byteOffset, counts.byteOffset + 4)
-            : wa.plant_generate(binder.ptr, positions.byteOffset, normals.byteOffset, uvs.byteOffset, colors.byteOffset, MAX_VERTS);
-          // the colour alpha holds a per-part wind phase, not opacity: the material would read it as opacity
-          for (let i = 3; i < total * 4; i += 4) colors[i] = 1;
-
-          const geo = engine.create_geometry();
-          geo.positions = engine.geometry_set_attr({ item_size: 3 });
-          geo.normals = engine.geometry_set_attr({ item_size: 3 });
-          geo.uvs = engine.geometry_set_attr({ item_size: 2 });
-          geo.colors = engine.geometry_set_attr({ item_size: 4 });
-          geo.attr.a_position = geo.positions.uuid;
-          geo.attr.a_normal = geo.normals.uuid;
-          geo.attr.a_uv = geo.uvs.uuid;
-          geo.attr.a_color = geo.colors.uuid;
-          engine.geometry_set_attr(geo.positions, positions, total * 3);
-          engine.geometry_set_attr(geo.normals, normals, total * 3);
-          engine.geometry_set_attr(geo.uvs, uvs, total * 2);
-          engine.geometry_set_attr(geo.colors, colors, total * 4);
-
-          const inst = engine.geometry_set_attr({ buffer_type: DYNAMIC_DRAW, item_size: 3, divisor: 1 });
-          geo.attr.a_instance_a_position = inst.uuid;
-          engine.geometry_set_attr(inst, new Float32Array(3), 3);
-          return { geo: geo, total: total, inst: inst, count: 0 };
+      let gen_scratch = null;
+      function gen_buffers() {
+        if (!gen_scratch) {
+          // plant_estimate_max_verts ignores the flower / ear geometry that flowerChance adds, so don't size from it
+          const MAX = 120000;
+          gen_scratch = { max: MAX, positions: wa.fp32_array(MAX * 3), normals: wa.fp32_array(MAX * 3), uvs: wa.fp32_array(MAX * 2), colors: wa.fp32_array(MAX * 4), counts: wa.u32_array(2) };
         }
+        return gen_scratch;
+      }
 
-        // Aliasing of distant blades. A blade is a ribbon a few millimetres wide, so beyond a few metres it is much
-        // narrower than a pixel; the deferred pipeline has no MSAA, so a pixel either happens to catch a blade or
-        // misses it and the field turns into shimmering dots. The cure is to never let a ribbon get thinner than about
-        // a pixel: in the vertex shader each edge is pushed outwards by up to half a pixel, fading in with distance.
-        // plant_build_blade writes u = 0 for the left edge and u = 1 for the right, the width axis is always
-        // horizontal, and the front-face normal is width_axis x tangent, so up x normal points along the width axis
-        // (times the tangent's upward part). The 12 vertices of a blade segment are 6 front then 6 back-face ones
-        // (negated normals), hence the gl_VertexID test.
-        const BLADE_WIDEN_SHADER = `
+      function apply_props(binder, props, seed) {
+        binder.apply_preset(0);
+        Object.keys(props).forEach(function (k) { binder[k] = props[k]; });
+        if (seed !== undefined) binder.seed = seed;
+      }
+
+      // Aliasing of distant blades. A blade is a ribbon a few millimetres wide, so beyond a few metres it is much
+      // narrower than a pixel and the field turns into shimmering dots. In the vertex shader each edge is pushed outwards
+      // by up to half a pixel, fading in with distance, so a ribbon never gets thinner than about a pixel.
+      // plant_build_blade writes u = 0 for the left edge and u = 1 for the right, the width axis is always horizontal,
+      // and the front-face normal is width_axis x tangent, so up x normal points along the width axis. The 12 vertices of
+      // a blade segment are 6 front then 6 back-face ones (negated normals), hence the gl_VertexID test.
+      const BLADE_WIDEN_SHADER = `
 uniform vec2 u_render_size;
 uniform vec3 u_blade_widen;     // x: start distance, y: full-effect distance, z: strength in pixels (0 = off)
 void vertex(){
@@ -737,79 +703,197 @@ void vertex(){
 		}
 	}
 }`;
-        const plant_params = new URLSearchParams(location.search);
-        const plant_mat = engine.materials.create({
+      const url_params = new URLSearchParams(location.search);
+      function make_plant_material() {
+        return engine.materials.create({
           compiler: "pbr",
           props: { enable_vertex_color: true },
           state: { cullFace: null },                      // blades and petals are single ribbons: draw both faces
           shader: BLADE_WIDEN_SHADER,
           uniforms: {
             u_roughness: 0.8,
-            u_blade_widen: engine.math.vec3(3.0, 14.0, plant_params.has("widen") ? parseFloat(plant_params.get("widen")) : 1.0),
+            u_blade_widen: engine.math.vec3(3.0, 14.0, url_params.has("widen") ? parseFloat(url_params.get("widen")) : 1.0),
           },
         });
-        const ground_geo = engine.geometries.plane(40, 40, 1, 1, 2);   // last argument: 1 = XY (a wall), 2 = XZ (the ground)
-        const ground_mat = engine.materials.create({
-          compiler: "pbr",
-          state: { cullFace: null },
-          uniforms: { u_base_color: engine.math.vec4(0.09, 0.075, 0.035, 1), u_roughness: 1 },
+      }
+
+      function make_ground(size, color) {
+        const geo = engine.geometries.plane(size, size, 1, 1, 2);   // last argument: 1 = XY (a wall), 2 = XZ (the ground)
+        const mat = engine.materials.create({ compiler: "pbr", state: { cullFace: null }, uniforms: { u_base_color: engine.math.vec4(color[0], color[1], color[2], 1), u_roughness: 1 } });
+        return { render: function () { engine.render_item(geo, mat, 0, 0, 0); } };
+      }
+
+      function mulberry(a) {
+        return function () {
+          a = (a + 0x6D2B79F5) >>> 0;
+          let t = a;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      // Lower-detail versions of a plant: fewer, fatter blades and fewer ribbon segments (the blade widening shader keeps
+      // the coverage up), fewer petals and leaves for flowers.
+      function plant_lod_props(def, level) {
+        const p = Object.assign({}, def.props);
+        if (level === 0) return p;
+        const near = level === 1;
+        const seg = Math.max(near ? 2 : 1, Math.round(p.segments * (near ? 0.6 : 0.34)));
+        if (def.generator === "plant") {
+          p.bladeCount = Math.max(near ? 6 : 4, Math.round(p.bladeCount * (near ? 0.5 : 0.22)));
+          const k = near ? 1.7 : 3.6;
+          p.bladeWidth *= k; p.bladeWidthVariance *= k;
+          p.segments = seg;
+        }
+        else {
+          p.segments = seg;
+          if (p.petalCount > 0) p.petalCount = Math.max(3, Math.round(p.petalCount * (near ? 0.6 : 0.35)));
+          p.leafCount = Math.max(1, Math.round(p.leafCount * (near ? 0.7 : 0.4)));
+          const k = near ? 1.4 : 2.2;
+          p.stemWidth *= k; p.leafWidth *= k; p.petalWidth *= k;
+        }
+        return p;
+      }
+
+      // A plant "kind" for the LOD manager: VARIANTS seeds x 3 levels of detail, each uploaded once as an instanced geometry.
+      function build_plant_kind(lod, binders, def, material, variants) {
+        const b = gen_buffers(), vs = [];
+        for (let v = 0; v < variants; v++) {
+          const levels = [];
+          for (let level = 0; level < 3; level++) {
+            const binder = def.generator === "rich" ? binders.rich : binders.plant;
+            apply_props(binder, plant_lod_props(def, level), def.props.seed + v);
+            const total = def.generator === "rich"
+              ? wa.rich_plant_generate(binder.ptr, b.positions.byteOffset, b.normals.byteOffset, b.uvs.byteOffset, b.colors.byteOffset, b.max, b.counts.byteOffset, b.counts.byteOffset + 4)
+              : wa.plant_generate(binder.ptr, b.positions.byteOffset, b.normals.byteOffset, b.uvs.byteOffset, b.colors.byteOffset, b.max);
+            // the colour alpha holds a per-part wind phase, not opacity: the material would read it as opacity
+            for (let i = 3; i < total * 4; i += 4) b.colors[i] = 1;
+            const g = lod.upload(total, b);
+            levels.push({ geo: g.geo, inst: g.inst, vertices: total, draws: [{ material: material, offset: 0, count: total }] });
+          }
+          vs.push(levels);
+        }
+        const s = Math.min(3, Math.max(1, def.generated.height * 1.6));   // taller plants stay detailed further out
+        return lod.add_kind({
+          id: def.id, group: "plants", variants: vs,
+          distances: [6 * s, 16 * s, 34 * s, 52 * s], keep: [1, 1, 0.8],
+          shadow_levels: def.generated.height > 0.8 ? 2 : 1,              // small plants only cast shadows while they are close
         });
+      }
 
-        let habitat = null, density_scale = 1, scatter_seed = 1, stats = { instances: 0, vertices: 0 };
-        const stats_div = dom.$.div({ $style: "color:white;padding:4px;font-size:90%" });
+      // Lower-detail versions of a tree: thinner trunk rings, then one branch level fewer with bigger leaf cards.
+      function tree_lod_props(sp, level) {
+        const p = Object.assign({}, sp.props);
+        if (level === 0) return p;
+        p.segments = level === 1 ? Math.max(4, 2 * Math.round((p.segments - 2) / 2)) : 4;
+        if (level === 2) { p.levels = Math.max(3, p.levels - 1); p.twigScale *= 1.25; }
+        return p;
+      }
 
-        function mulberry(a) {
-          return function () {
-            a = (a + 0x6D2B79F5) >>> 0;
-            let t = a;
-            t = Math.imul(t ^ (t >>> 15), t | 1);
-            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-          };
+      function build_tree_kind(lod, binder, sp, bark_mat, leaf_mat, variants) {
+        const b = gen_buffers(), vs = [];
+        for (let v = 0; v < variants; v++) {
+          const levels = [];
+          for (let level = 0; level < 3; level++) {
+            apply_props(binder, tree_lod_props(sp, level), sp.props.seed + v * 17);
+            const total = wa.tree_generate(binder.ptr, b.positions.byteOffset, b.normals.byteOffset, b.uvs.byteOffset, b.colors.byteOffset, b.max, b.counts.byteOffset);
+            const woody = b.counts[0];
+            const g = lod.upload(total, b);
+            levels.push({ geo: g.geo, inst: g.inst, vertices: total,
+              draws: [{ material: bark_mat, offset: 0, count: woody }, { material: leaf_mat, offset: woody, count: total - woody }] });
+          }
+          vs.push(levels);
         }
+        return lod.add_kind({ id: sp.id, group: "trees", variants: vs, distances: [40, 100, 240, 420], keep: [1, 1, 1], shadow_levels: 3 });
+      }
 
-        function place(variant_lists) {                   // upload the instance positions of every variant
-          stats.instances = 0; stats.vertices = 0;
-          Object.keys(library).forEach(function (id) {
-            library[id].variants.forEach(function (v, i) {
-              const list = (variant_lists[id] && variant_lists[id][i]) || [];
-              v.count = list.length / 3;
-              if (v.count > 0) engine.geometry_set_attr(v.inst, new Float32Array(list), list.length);
-              stats.instances += v.count;
-              stats.vertices += v.count * v.total;
-            });
-          });
-          stats_div.textContent = stats.instances + " plants, " + (stats.vertices / 1e6).toFixed(2) + " M vertices drawn";
+      const leaf_texture_cache = {};
+      function leaf_texture_for(id) {
+        if (!leaf_texture_cache[id]) {
+          const px = leaf_textures.pixels(id, 256);
+          const flipped = new Uint8Array(px.data.length), stride = px.width * 4;   // canvas v = 1 is the top row; GL row 0 is v = 0
+          for (let y = 0; y < px.height; y++) flipped.set(px.data.subarray(y * stride, (y + 1) * stride), (px.height - 1 - y) * stride);
+          leaf_texture_cache[id] = engine.textures.create({ width: px.width, height: px.height, source: flipped, clamp: true });
         }
+        return leaf_texture_cache[id];
+      }
+      function make_leaf_material(id) {
+        return engine.materials.create({ compiler: "pbr", uniforms: { u_base_color_map: leaf_texture_for(id), u_alpha_test: 0.5, u_roughness: 0.85 } });
+      }
+
+      // text for the LOD statistics: instances drawn per level, per group
+      function lod_stats_text(lod) {
+        const st = lod.stats, groups = {};
+        Object.keys(lod.kinds).forEach(function (id) {
+          const k = lod.kinds[id], g = groups[k.group] = groups[k.group] || [0, 0, 0, 0];
+          (st.per_kind[id] || []).forEach(function (c, l) { g[l] += c; });
+        });
+        return Object.keys(groups).map(function (g) { return g + " L0/L1/L2: " + groups[g].slice(0, 3).join(" / "); }).join("\n")
+          + "\n" + st.drawn + " drawn of " + st.instances + "\n" + (st.vertices / 1e6).toFixed(2) + " M vertices (" + (st.full_vertices / 1e6).toFixed(2) + " M at full detail)";
+      }
+
+      // camera: a rig that can fly along a path at eye height, to see the LOD switch
+      function make_fly(speed_default) {
+        const fly = { on: url_params.get("fly") === "1", speed: parseFloat(url_params.get("speed") || speed_default || 3), t: parseFloat(url_params.get("t") || "0"), radius: 34 };
+        fly.step = function () {                         // advances a fixed distance per rendered frame, so the motion is the same at any frame rate
+          if (!fly.on) return;
+          fly.t += fly.speed / 60;
+          const a = fly.t / fly.radius;
+          const x = Math.cos(a) * fly.radius, z = Math.sin(a) * fly.radius;
+          const c = scene.camera.control;
+          engine.tra_model.set_position(c, x, 1.35, z);
+          // the camera sits behind the control, on its local +z axis (sin yaw, 0, cos yaw), so that axis must point against the travel direction (-sin a, cos a)
+          c.eular[1] = Math.atan2(Math.sin(a), -Math.cos(a));
+          engine.tra_model.set_eular(c, 0.1, c.eular[1], 0);
+        };
+        return fly;
+      }
+
+      // =============================================================================================
+      // plants and grass (plant_system.cpp), loaded with  ?scene=plants[&habitat=<id>]
+      //
+      // plant_generate makes blade plants (grass, rosettes, ferns) and rich_plant_generate makes a stem with
+      // leaves and a flower. plant_presets.json holds a catalog of both; every plant is generated with a few
+      // seeds at three levels of detail and scattered over a habitat with instancing. The LOD manager
+      // (scatter_lod.js) sorts the instances by distance each time the camera has moved.
+      // =============================================================================================
+      function plants_test() {
+        const binders = { plant: make_plant_props(wa), rich: make_rich_plant_props(wa) };   // also give the sliders
+        const lod = scatter_lod.create(engine, { camera_position: scene.camera.world_position });
+        lod.enabled = url_params.get("lod") !== "0";
+        const VARIANTS = 4;
+        const plant_mat = make_plant_material();
+        const ground = make_ground(80, [0.09, 0.075, 0.035]);
+
+        let habitat = null, density_scale = 1, scatter_seed = 1;
+        const stats_div = dom.$.div({ $style: "color:white;padding:4px;font-size:90%;white-space:pre" });
 
         function build_habitat(h) {
           habitat = h;
-          scene.camera.control.distance = Math.max(2.5, h.size_m * (plant_params.has("zoom") ? parseFloat(plant_params.get("zoom")) : 0.8));   // pull back to fit the habitat
+          scene.camera.control.distance = Math.max(2.5, h.size_m * (url_params.has("zoom") ? parseFloat(url_params.get("zoom")) : 0.8));
           engine.tra_model.set_position(scene.camera.control, 0, 0.25, 0);
           const rand = mulberry(7919 * scatter_seed);
-          const lists = {};
+          Object.keys(lod.kinds).forEach(function (id) { lod.set_instances(id, new Float32Array(0)); });
           if (h.id === "showcase") {                      // one of each, in a row
-            const ids = Object.keys(library);
-            ids.forEach(function (id, i) { lists[id] = [[(i - (ids.length - 1) / 2) * 1.1, 0, 0], [], [], []]; });
+            const ids = Object.keys(lod.kinds);
+            ids.forEach(function (id, i) { lod.set_instances(id, new Float32Array([(i - (ids.length - 1) / 2) * 1.1, 0, 0])); });
           }
           else {
             h.plants.forEach(function (e) {
-              if (!library[e.plant]) return;
-              const n = Math.min(40000, Math.round(e.density_per_m2 * density_scale * h.size_m * h.size_m));
-              const per = []; for (let i = 0; i < VARIANTS; i++) per.push([]);
-              for (let i = 0; i < n; i++) per[Math.floor(rand() * VARIANTS)].push((rand() - 0.5) * h.size_m, 0, (rand() - 0.5) * h.size_m);
-              lists[e.plant] = per;
+              if (!lod.kinds[e.plant]) return;
+              const n = Math.min(60000, Math.round(e.density_per_m2 * density_scale * h.size_m * h.size_m));
+              const xyz = new Float32Array(n * 3);
+              for (let i = 0; i < n; i++) { xyz[i * 3] = (rand() - 0.5) * h.size_m; xyz[i * 3 + 2] = (rand() - 0.5) * h.size_m; }
+              lod.set_instances(e.plant, xyz);
             });
           }
-          place(lists);
+          lod.update(true);
         }
 
         httprequest.get_url("plant_presets.json", "json").then(function (doc) {
           if (!doc || !doc.plants) return;
-          doc.plants.forEach(function (def) {
-            library[def.id] = { def: def, variants: [] };
-            for (let i = 0; i < VARIANTS; i++) library[def.id].variants.push(upload_plant(def, def.props.seed + i));
-          });
+          doc.plants.forEach(function (def) { build_plant_kind(lod, binders, def, plant_mat, VARIANTS); });
           const habitats = doc.habitats.concat([{ id: "showcase", name: "Showcase (one of each)", size_m: 14, plants: [] }]);
           const habitat_select = dom.$.select({
             $style: "width:100%; margin-bottom: 6px;",
@@ -824,23 +908,14 @@ void vertex(){
             type: "range", min: 0, max: 2, step: 0.05, value: plant_mat.uniforms.u_blade_widen[2], $style: "width:100%",
             oninput: function () { plant_mat.uniforms.u_blade_widen[2] = parseFloat(this.value); },
           });
-          dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px;color:white" }, habitat_select, "density ", density_slider, "distant blade widening ", widen_slider, reseed, stats_div), dom.sidebar$.firstChild);
-          const want = (new URLSearchParams(location.search)).get("habitat");
+          const lod_toggle = dom.$.label({ $style: "display:block" }, dom.$.input({ type: "checkbox", checked: lod.enabled, onchange: function () { lod.enabled = this.checked; lod.invalidate(); } }), " dynamic LOD");
+          dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px;color:white" }, habitat_select, "density ", density_slider, "distant blade widening ", widen_slider, lod_toggle, reseed, stats_div), dom.sidebar$.firstChild);
+          const want = url_params.get("habitat");
           const found = Math.max(0, habitats.findIndex(function (h) { return h.id === want; }));
           habitat_select.value = found;
           build_habitat(habitats[found]);
-          console.log("plants", Object.keys(library).length, "species,", VARIANTS, "seeds each");
+          console.log("plants", Object.keys(lod.kinds).length, "species,", VARIANTS, "seeds x 3 LODs each");
         });
-
-        function render_scene() {
-          engine.render_item(ground_geo, ground_mat, 0, 0, 0);
-          Object.keys(library).forEach(function (id) {
-            library[id].variants.forEach(function (v) {
-              if (v.count > 0) engine.render_item(v.geo, plant_mat, 0, v.total, v.count);
-            });
-          });
-          engine.debug.render();
-        }
 
         engine.tra_model.yaw_pitch(scene.camera.control, 0, 0.38);        // look down at the ground, not along it
 
@@ -852,21 +927,126 @@ void vertex(){
           ENABLE_LOGDEPTH: false,
         });
         antialias_controls(scr);
-        scr.on_shadowmap = function (time, time_delta) { render_scene(); };
-        scr.on_frame = function (time, time_delta) { render_scene(); };
+        scr.on_shadowmap = function (time, time_delta) { lod.render("shadow"); };
+        scr.on_frame = function (time, time_delta) {
+          lod.update();
+          stats_div.textContent = lod_stats_text(lod);
+          ground.render();
+          lod.render("main");
+          engine.debug.render();
+        };
+      }
+
+      // =============================================================================================
+      // forest: trees (tree_system) with undergrowth (plant_system) together, ?scene=forest
+      // Everything is instanced and level-of-detail sorted by distance from the camera as it moves; ?fly=1 flies
+      // the camera along a path at eye height, ?lod=0 turns the LOD off to compare the cost.
+      // =============================================================================================
+      function forest_test() {
+        const WORLD = 130;                                // metres, a square centred on the origin
+        const binders = { plant: make_plant_props(wa), rich: make_rich_plant_props(wa) };
+        const tree_binder = make_tree_props(wa);
+        const lod = scatter_lod.create(engine, { camera_position: scene.camera.world_position });
+        lod.enabled = url_params.get("lod") !== "0";
+        if (url_params.has("bias")) lod.bias = parseFloat(url_params.get("bias"));
+        const plant_mat = make_plant_material();
+        const bark_mat = engine.materials.create({ compiler: "pbr", props: { enable_vertex_color: true }, uniforms: { u_roughness: 0.9 } });
+        const ground = make_ground(WORLD * 1.6, [0.07, 0.085, 0.03]);
+        const fly = make_fly(3);
+        const stats_div = dom.$.div({ $style: "color:white;padding:4px;font-size:90%;white-space:pre" });
+
+        const TREES = [["english_oak", 0.22], ["common_beech", 0.2], ["silver_birch", 0.18], ["scots_pine", 0.15], ["norway_spruce", 0.13], ["sugar_maple", 0.12]];
+        // plants per square metre in the forest (the meadow densities are far too high to carry over 17,000 m^2)
+        const UNDERGROWTH = { meadow_grass: 1.4, white_clover: 0.7, fern: 0.07, tussock_grass: 0.03, daisy: 0.1, dandelion: 0.06, poppy: 0.05, cornflower: 0.05, lavender: 0.015 };
+
+        function populate() {
+          const rand = mulberry(20241);
+          // trees: dart throwing with a minimum spacing, species picked by weight
+          const trees = [], by_species = {}, MIN_GAP = 5.5, N_TREES = parseInt(url_params.get("trees") || "170");
+          for (let tries = 0; tries < N_TREES * 40 && trees.length < N_TREES; tries++) {
+            const x = (rand() - 0.5) * WORLD, z = (rand() - 0.5) * WORLD;
+            if (Math.hypot(x, z) < 6) continue;           // keep the starting clearing open
+            if (trees.some(function (t) { return Math.hypot(t[0] - x, t[1] - z) < MIN_GAP; })) continue;
+            let r = rand(), id = TREES[TREES.length - 1][0];
+            for (let i = 0; i < TREES.length; i++) { r -= TREES[i][1]; if (r < 0) { id = TREES[i][0]; break; } }
+            trees.push([x, z]); (by_species[id] = by_species[id] || []).push(x, 0, z);
+          }
+          Object.keys(lod.kinds).forEach(function (id) {
+            const k = lod.kinds[id];
+            if (k.group === "trees") lod.set_instances(id, new Float32Array(by_species[id] || []));
+          });
+          // undergrowth, kept clear of trunks; ferns cluster under the trees, clover grows in patches
+          const near_tree = function (x, z, r) { for (let i = 0; i < trees.length; i++) if (Math.abs(trees[i][0] - x) < r && Math.abs(trees[i][1] - z) < r && Math.hypot(trees[i][0] - x, trees[i][1] - z) < r) return true; return false; };
+          Object.keys(UNDERGROWTH).forEach(function (id) {
+            if (!lod.kinds[id]) return;
+            const n = Math.round(UNDERGROWTH[id] * WORLD * WORLD * (parseFloat(url_params.get("density") || "1")));
+            const out = [];
+            for (let i = 0; i < n; i++) {
+              let x = (rand() - 0.5) * WORLD, z = (rand() - 0.5) * WORLD;
+              if (id === "fern" && trees.length) { const t = trees[Math.floor(rand() * trees.length)], a = rand() * 6.283, r = 1.5 + rand() * 4.5; x = t[0] + Math.cos(a) * r; z = t[1] + Math.sin(a) * r; }
+              if (id === "white_clover" && Math.sin(x * 0.11) + Math.sin(z * 0.14) + Math.sin((x + z) * 0.06) < 0.9) continue;
+              if (near_tree(x, z, 0.7)) continue;
+              out.push(x, 0, z);
+            }
+            lod.set_instances(id, new Float32Array(out));
+          });
+          lod.update(true);
+        }
+
+        Promise.all([httprequest.get_url("tree_trunk_presets.json", "json"), httprequest.get_url("plant_presets.json", "json")]).then(function (docs) {
+          const tree_doc = docs[0], plant_doc = docs[1];
+          if (!tree_doc || !plant_doc) return;
+          TREES.forEach(function (t) {
+            const sp = tree_doc.trees.find(function (x) { return x.id === t[0]; });
+            if (sp) build_tree_kind(lod, tree_binder, sp, bark_mat, make_leaf_material(sp.leaf_texture), 3);
+          });
+          plant_doc.plants.forEach(function (def) { if (UNDERGROWTH[def.id] !== undefined) build_plant_kind(lod, binders, def, plant_mat, 3); });
+          populate();
+
+          const lod_toggle = dom.$.label({ $style: "display:block" }, dom.$.input({ type: "checkbox", checked: lod.enabled, onchange: function () { lod.enabled = this.checked; lod.invalidate(); } }), " dynamic LOD");
+          const bias_slider = dom.$.input({ type: "range", min: 0.3, max: 3, step: 0.05, value: lod.bias, $style: "width:100%", oninput: function () { lod.bias = parseFloat(this.value); lod.invalidate(); } });
+          const fly_toggle = dom.$.label({ $style: "display:block" }, dom.$.input({ type: "checkbox", checked: fly.on, onchange: function () { fly.on = this.checked; } }), " fly through the forest");
+          const speed_slider = dom.$.input({ type: "range", min: 0.5, max: 12, step: 0.5, value: fly.speed, $style: "width:100%", oninput: function () { fly.speed = parseFloat(this.value); } });
+          const widen_slider = dom.$.input({ type: "range", min: 0, max: 2, step: 0.05, value: plant_mat.uniforms.u_blade_widen[2], $style: "width:100%", oninput: function () { plant_mat.uniforms.u_blade_widen[2] = parseFloat(this.value); } });
+          dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px;color:white" }, lod_toggle, "LOD distance bias ", bias_slider, fly_toggle, "speed (m/s) ", speed_slider, "distant blade widening ", widen_slider, stats_div), dom.sidebar$.firstChild);
+          console.log("forest", Object.keys(lod.kinds).length, "kinds");
+        });
+
+        scene.camera.control.distance = parseFloat(url_params.get("dist") || "5");
+        engine.tra_model.set_position(scene.camera.control, 0, 1.35, 0);
+        engine.tra_model.yaw_pitch(scene.camera.control, parseFloat(url_params.get("yaw") || "0"), 0.1);
+
+        const scr = engine.deffered_rendering({
+          camera: scene.camera,
+          dlight0: scene.dlight0,
+          ENABLE_ATMOSPHERE: url_params.get("sky") !== "0",     // the engine's atmosphere (sky, sun disc, aerial perspective); ?sky=0 for a black sky
+          ENABLE_SHADOWS: true,
+          ENABLE_LOGDEPTH: false,
+        });
+        antialias_controls(scr);
+        scr.on_shadowmap = function (time, time_delta) { lod.render("shadow"); };
+        scr.on_frame = function (time, time_delta) {
+          fly.step();
+          lod.update();
+          stats_div.textContent = lod_stats_text(lod);
+          ground.render();
+          lod.render("main");
+          engine.debug.render();
+        };
       }
 
 
-      // ?scene=plants shows the plant / grass catalog, anything else the tree test
+      // ?scene=plants shows the plant / grass catalog, ?scene=forest trees with undergrowth, anything else the tree test
       const scene_select = dom.$.select({
         $style: "width:100%; margin-bottom: 6px;",
         onchange: function () { location.search = "?scene=" + this.value; },
-      }, dom.$.option({ value: "trees" }, "Scene: trees"), dom.$.option({ value: "plants" }, "Scene: plants and grass"));
-      const scene_name = (new URLSearchParams(location.search)).get("scene") === "plants" ? "plants" : "trees";
+      }, dom.$.option({ value: "trees" }, "Scene: trees"), dom.$.option({ value: "plants" }, "Scene: plants and grass"), dom.$.option({ value: "forest" }, "Scene: forest with undergrowth (LOD)"));
+      const scene_name = ["plants", "forest"].indexOf(url_params.get("scene")) >= 0 ? url_params.get("scene") : "trees";
       scene_select.value = scene_name;
       dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px" }, scene_select), dom.sidebar$.firstChild);
 
       if (scene_name === "plants") plants_test();
+      else if (scene_name === "forest") forest_test();
       else test1();
 
     }
