@@ -3239,23 +3239,6 @@ function create_packing(root_url) {
 
 		packing("http")("http.basic_server", function (http) {
 
-			const createCanvas = require("canvas").createCanvas;
-			const Image = require("canvas").Image;
-
-			const thumb_folder = "D:\\work\\packing-thumbs\\";
-			const str_hash = function (str) {
-				str = str.toString();
-				let hash = 0, i, chr;
-				if (str.length === 0) return hash;
-				for (i = 0; i < str.length; i++) {
-					chr = str.charCodeAt(i);
-					hash = ((hash << 5) - hash) + chr;
-					hash |= 0;
-				}
-				return hash + (2147483648);
-			};
-			let thumb_canvas = createCanvas(120, 120);
-			let thumb_ctx = thumb_canvas.getContext('2d');
 			http.basic_server = function (s) {
 				s = s || "default";
 				const p = (function () {
@@ -3273,30 +3256,6 @@ function create_packing(root_url) {
 				server.get("/exist", function (req, res) {
 					res.end(server.fs.existsSync(decodeURIComponent(req.search)) ? "true" : "false");
 
-				});
-
-				server.get("/thumb", function (req, res) {
-					const name = decodeURIComponent(req.search);
-					const file = thumb_folder + encodeURIComponent(name) + ".jpg";
-
-					if (server.fs.existsSync(file)) {
-						return server.file(file);
-					}
-					const img = new Image();
-					img.onload = function () {
-						thumb_ctx.clearRect(0, 0, thumb_canvas.width, thumb_canvas.height);
-						thumb_ctx.drawImage(img, 0, 0, thumb_canvas.width, thumb_canvas.height);
-						server.fs.writeFileSync(file, new Uint8Array(thumb_canvas.toBuffer('image/jpeg', { quality: 0.25 }).buffer));
-						server.file(file);
-					}
-					img.onerror = function (err) {
-						img.onload = null;
-						img.onerror = null;
-						console.log("error", err);
-						res.end();
-					};
-					img.src = name;
-					console.log("thumb", name);
 				});
 
 				const exec = require('child_process').exec;
@@ -11034,7 +10993,6 @@ const char* sprint(const char* fmt, ...) {
 
 
 			}
-			const imr = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 
 			function create_file_item(path, f) {
 
@@ -11052,9 +11010,9 @@ const char* sprint(const char* fmt, ...) {
 						$hash: hash_str(path + f),
 						$title: f,
 						filename: f,
-						src: imr,
-						url: "/get?" + encodeURIComponent(path + f),
-						$thumb: "/thumb?" + encodeURIComponent(path + f)
+						src: "/get?" + encodeURIComponent(path + f),
+						loading: "lazy",
+						url: "/get?" + encodeURIComponent(path + f)
 					});
 					return m;
 				}
@@ -11107,30 +11065,7 @@ const char* sprint(const char* fmt, ...) {
 				if (tv.path) {
 					open_path(tv, tv.path, tv);
 				}
-				document.addEventListener(/Firefox/i.test(navigator.userAgent) ? "DOMMouseScroll" : "mousewheel", function () {
-					file_browser.update_thumbs(tv);
-				}, false);
-
-
 				return tv;
-			}
-
-			file_browser.update_thumbs = function (fb) {
-				//fb = fb.parentNode;
-				const pr = fb.getBoundingClientRect();
-				let li = 0;
-				//console.log(fb.scrollHeight, pr);
-
-				const list = fb.querySelectorAll("img[thumb]");
-				list.forEach(function (n) {
-					const r = n.getBoundingClientRect();
-					if (((r.top + r.height) > pr.top && (r.top - r.height) < pr.top + pr.height)) {
-						n.src = n.getAttribute("thumb");
-						n.removeAttribute("thumb");
-						li++;
-					}
-				});
-				if (li > 0) console.log("thumbs", li, list.length);
 			}
 
 			file_browser.get_folder_files = function (path) {
