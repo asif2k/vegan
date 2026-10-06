@@ -2123,7 +2123,7 @@ function create_packing(root_url) {
 										console.log(source);
 										const hsource = hash_str(source);
 									
-										const file = "D:\\work\\" + hsource + ".js";
+										const file = "whashes\\" + hsource + ".js";
 
 										get_file("/exist?" + file, "text").then(function (res) {
 											//console.log("wasms$", [file,res])
