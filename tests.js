@@ -1,0 +1,591 @@
+packing("engine.js","debug.js")(function (engine, dom, httprequest) {
+  function ready(engine) {
+
+    const math = engine.math;
+    const wa = engine.wa;
+
+    function suit0() {
+      const scene = engine.debug.scene();
+      console.log("engine is ready", [engine, scene]);
+
+      // Each list's order must exactly match its C++ struct's (now single) float
+      // block -- see tree_props/plant_props/rich_plant_props in tree_system.cpp /
+      // plant_system.cpp. whole_number_names below marks which of these should be
+      // rounded on write (former int fields, plus new int-like knobs).
+      const TREE_PROP_NAMES = [
+        "clumpMax", "clumpMin", "lengthFalloffFactor", "lengthFalloffPower",
+        "branchFactor", "radiusFalloffRate", "climbRate", "trunkKink", "maxRadius",
+        "taperRate", "twistRate", "sweepAmount", "initialBranchLength", "trunkLength",
+        "dropAmount", "growAmount", "vMultiplier", "twigScale", "seed",
+        "branchFactorTrunk", "clumpMaxTrunk", "clumpMinTrunk",
+        "barkColorR", "barkColorG", "barkColorB", "barkColorVariance",
+        "fruitChance", "fruitSize", "fruitColorR", "fruitColorG", "fruitColorB",
+        "treeSteps", "segments", "levels",
+        "rootFlare", "twigAngleJitter", "fruitClusterCount",
+      ];
+      const TREE_WHOLE_NUMBER_NAMES = [
+        "treeSteps", "segments", "levels", "fruitClusterCount",
+      ];
+      const TREE_COLOR_NAMES = ["barkColor", "fruitColor"];
+
+      const PLANT_PROP_NAMES = [
+        "bladeLength", "bladeLengthVariance", "bladeWidth", "bladeWidthVariance",
+        "tipTaper", "curveAmount", "curveVariance", "lean", "leanVariance",
+        "twistVariance", "clusterRadius", "vMultiplier", "seed",
+        "bladeColorBaseR", "bladeColorBaseG", "bladeColorBaseB",
+        "bladeColorTipR", "bladeColorTipG", "bladeColorTipB", "colorVariance",
+        "flowerChance", "flowerSize", "flowerColorR", "flowerColorG", "flowerColorB",
+        "bladeCount", "segments", "arrangement",
+        "bladeFold", "tuftRadius", "tuftCount",
+      ];
+      const PLANT_WHOLE_NUMBER_NAMES = ["bladeCount", "segments", "arrangement", "tuftCount"];
+      const PLANT_COLOR_NAMES = ["bladeColorBase", "bladeColorTip", "flowerColor"];
+
+      const RICH_PLANT_PROP_NAMES = [
+        "stemLength", "stemWidth", "stemLean", "stemCurve",
+        "leafLength", "leafLengthVariance", "leafWidth", "leafWidthVariance", "leafTipTaper",
+        "leafAttachStart", "leafAttachEnd", "leafOutwardAngle", "leafOutwardVariance",
+        "petalLength", "petalWidth", "petalTipTaper", "petalCurl",
+        "flowerRadius", "bloomSize", "vMultiplier", "seed",
+        "stemColorR", "stemColorG", "stemColorB",
+        "leafColorR", "leafColorG", "leafColorB",
+        "petalColorR", "petalColorG", "petalColorB", "colorVariance",
+        "petalPitch", "petalPitchOuter", "petalRadiusInner",
+        "leafCount", "petalCount", "segments", "petalArrangement",
+      ];
+      const RICH_PLANT_WHOLE_NUMBER_NAMES = ["leafCount", "petalCount", "segments", "petalArrangement"];
+      const RICH_PLANT_COLOR_NAMES = ["stemColor", "leafColor", "petalColor"];
+
+      const UI_RANGES = {
+        tree_props: {
+          clumpMax: { min: 0.0, max: 2.0, step: 0.01, desc: "Canopy clumping max", example: 0.8 },
+          clumpMin: { min: 0.0, max: 2.0, step: 0.01, desc: "Canopy clumping min", example: 0.5 },
+          lengthFalloffFactor: { min: 0.1, max: 1.5, step: 0.01, desc: "Length scaling per level", example: 0.85 },
+          lengthFalloffPower: { min: 0.1, max: 3.0, step: 0.01, desc: "Power of length falloff", example: 1.0 },
+          branchFactor: { min: 1.0, max: 5.0, step: 0.1, desc: "Splitting factor", example: 3.5 },
+          radiusFalloffRate: { min: 0.1, max: 1.5, step: 0.01, desc: "Radius shrinking per level", example: 0.6 },
+          climbRate: { min: 0.1, max: 5.0, step: 0.1, desc: "Rate of branch climbing", example: 2.5 },
+          trunkKink: { min: 0.0, max: 1.0, step: 0.01, desc: "Trunk displacement", example: 0.0 },
+          maxRadius: { min: 0.01, max: 2.0, step: 0.01, desc: "Max base radius", example: 0.25 },
+          taperRate: { min: 0.5, max: 1.0, step: 0.01, desc: "Radius taper per segment", example: 0.95 },
+          twistRate: { min: 0.0, max: 30.0, step: 0.1, desc: "Twisting of branches", example: 13.0 },
+          sweepAmount: { min: -2.0, max: 2.0, step: 0.01, desc: "Bending/sweeping", example: 0.0 },
+          initialBranchLength: { min: 0.1, max: 5.0, step: 0.01, desc: "Length of initial branch", example: 0.85 },
+          trunkLength: { min: 0.1, max: 10.0, step: 0.1, desc: "Base trunk length", example: 2.5 },
+          dropAmount: { min: -2.0, max: 2.0, step: 0.01, desc: "Limb droop", example: 0.5 },
+          growAmount: { min: -2.0, max: 2.0, step: 0.01, desc: "Upwards reach", example: 0.0 },
+          vMultiplier: { min: 0.1, max: 10.0, step: 0.1, desc: "UV v-multiplier", example: 0.2 },
+          twigScale: { min: 0.1, max: 10.0, step: 0.1, desc: "Canopy tip size", example: 2.0 },
+          seed: { min: 0, max: 1000, step: 1, desc: "Random seed", example: 10 },
+          branchFactorTrunk: { min: 1.0, max: 5.0, step: 0.1, desc: "Splitting factor at trunk", example: 1.6 },
+          clumpMaxTrunk: { min: 0.0, max: 2.0, step: 0.01, desc: "Trunk clumping max", example: 0.95 },
+          clumpMinTrunk: { min: 0.0, max: 2.0, step: 0.01, desc: "Trunk clumping min", example: 0.8 },
+          barkColorVariance: { min: 0.0, max: 1.0, step: 0.01, desc: "Bark color variance", example: 0.08 },
+          treeSteps: { min: 1, max: 10, step: 1, desc: "Number of branch layers", example: 2 },
+          segments: { min: 3, max: 20, step: 1, desc: "Segments per branch", example: 6 },
+          levels: { min: 1, max: 7, step: 1, desc: "Recursion levels", example: 5 },
+          fruitChance: { min: 0.0, max: 1.0, step: 0.01, desc: "Chance of fruit on twigs", example: 0.2 },
+          fruitSize: { min: 0.01, max: 2.0, step: 0.01, desc: "Size of fruit", example: 0.5 },
+          rootFlare: { min: 0.0, max: 2.0, step: 0.01, desc: "Root flare / buttress widening", example: 0.0 },
+          twigAngleJitter: { min: 0.0, max: 1.57, step: 0.01, desc: "Random twig-plane rotation (radians)", example: 0.0 },
+          fruitClusterCount: { min: 1, max: 4, step: 1, desc: "Fruits per twig (grape/cherry clusters)", example: 1 }
+        },
+        plant_props: {
+          bladeLength: { min: 0.01, max: 3.0, step: 0.01, desc: "Length of blade", example: 0.35 },
+          bladeLengthVariance: { min: 0.0, max: 1.0, step: 0.01, desc: "Variance of length", example: 0.1 },
+          bladeWidth: { min: 0.001, max: 0.5, step: 0.001, desc: "Width of base", example: 0.025 },
+          bladeWidthVariance: { min: 0.0, max: 0.1, step: 0.001, desc: "Variance of width", example: 0.008 },
+          tipTaper: { min: 0.0, max: 1.0, step: 0.01, desc: "Width fraction at tip", example: 0.1 },
+          curveAmount: { min: -1.0, max: 1.0, step: 0.01, desc: "Forward bow", example: 0.15 },
+          curveVariance: { min: 0.0, max: 1.0, step: 0.01, desc: "Variance of curve", example: 0.08 },
+          lean: { min: 0.0, max: 3.14, step: 0.01, desc: "Tilt from vertical", example: 0.25 },
+          leanVariance: { min: 0.0, max: 3.14, step: 0.01, desc: "Variance of lean", example: 0.2 },
+          twistVariance: { min: 0.0, max: 6.28, step: 0.01, desc: "Azimuth jitter", example: 0.3 },
+          clusterRadius: { min: 0.0, max: 2.0, step: 0.01, desc: "Scatter disc radius", example: 0.3 },
+          vMultiplier: { min: 0.1, max: 10.0, step: 0.1, desc: "UV v-multiplier", example: 1.0 },
+          seed: { min: 0, max: 1000, step: 1, desc: "Random seed", example: 5 },
+          colorVariance: { min: 0.0, max: 1.0, step: 0.01, desc: "Color variance", example: 0.08 },
+          bladeCount: { min: 1, max: 200, step: 1, desc: "Number of blades", example: 40 },
+          segments: { min: 1, max: 20, step: 1, desc: "Curve subdivisions", example: 4 },
+          arrangement: { min: 0, max: 1, step: 1, desc: "0: scatter, 1: rosette", example: 0 },
+          flowerChance: { min: 0.0, max: 1.0, step: 0.01, desc: "Chance of flower/seed head", example: 0.2 },
+          flowerSize: { min: 0.01, max: 1.0, step: 0.01, desc: "Size of flower", example: 0.05 },
+          bladeFold: { min: 0.0, max: 1.0, step: 0.01, desc: "Cross-section fold depth (V-channel)", example: 0.0 },
+          tuftRadius: { min: 0.0, max: 1.0, step: 0.01, desc: "Local scatter radius within a tuft (fraction of cluster radius)", example: 0.3 },
+          tuftCount: { min: 1, max: 32, step: 1, desc: "Tussock/tiller clump count (arrangement 0 only)", example: 1 }
+        },
+        rich_plant_props: {
+          stemLength: { min: 0.1, max: 5.0, step: 0.01, desc: "Length of stem", example: 1.0 },
+          stemWidth: { min: 0.01, max: 0.5, step: 0.01, desc: "Width of stem", example: 0.05 },
+          stemLean: { min: 0.0, max: 3.14, step: 0.01, desc: "Tilt from vertical", example: 0.1 },
+          stemCurve: { min: -1.0, max: 1.0, step: 0.01, desc: "Forward bow", example: 0.1 },
+          leafLength: { min: 0.01, max: 3.0, step: 0.01, desc: "Length of leaves", example: 0.3 },
+          leafLengthVariance: { min: 0.0, max: 1.0, step: 0.01, desc: "Variance of length", example: 0.1 },
+          leafWidth: { min: 0.01, max: 1.0, step: 0.01, desc: "Width of leaves", example: 0.1 },
+          leafWidthVariance: { min: 0.0, max: 1.0, step: 0.01, desc: "Variance of width", example: 0.05 },
+          leafTipTaper: { min: 0.0, max: 1.0, step: 0.01, desc: "Taper at leaf tip", example: 0.1 },
+          leafAttachStart: { min: 0.0, max: 1.0, step: 0.01, desc: "Stem position to start leaves", example: 0.2 },
+          leafAttachEnd: { min: 0.0, max: 1.0, step: 0.01, desc: "Stem position to end leaves", example: 0.8 },
+          leafOutwardAngle: { min: 0.0, max: 3.14, step: 0.01, desc: "Angle outward from stem", example: 1.0 },
+          leafOutwardVariance: { min: 0.0, max: 3.14, step: 0.01, desc: "Variance of outward angle", example: 0.2 },
+          petalLength: { min: 0.01, max: 2.0, step: 0.01, desc: "Length of petals", example: 0.2 },
+          petalWidth: { min: 0.01, max: 1.0, step: 0.01, desc: "Width of petals", example: 0.1 },
+          petalTipTaper: { min: 0.0, max: 1.0, step: 0.01, desc: "Taper at petal tip", example: 0.1 },
+          petalCurl: { min: -1.0, max: 1.0, step: 0.01, desc: "Curl of petals", example: 0.2 },
+          flowerRadius: { min: 0.0, max: 1.0, step: 0.01, desc: "Radius of flower center", example: 0.05 },
+          bloomSize: { min: 0.1, max: 5.0, step: 0.01, desc: "Overall flower bloom scale", example: 1.0 },
+          vMultiplier: { min: 0.1, max: 10.0, step: 0.1, desc: "UV v-multiplier", example: 1.0 },
+          seed: { min: 0, max: 1000, step: 1, desc: "Random seed", example: 42 },
+          colorVariance: { min: 0.0, max: 1.0, step: 0.01, desc: "Color variance", example: 0.1 },
+          leafCount: { min: 0, max: 50, step: 1, desc: "Number of leaves", example: 10 },
+          petalCount: { min: 0, max: 50, step: 1, desc: "Number of petals", example: 8 },
+          petalPitch: { min: 0.0, max: 3.14, step: 0.01, desc: "Inner petal lean", example: 0.1 },
+          petalPitchOuter: { min: 0.0, max: 3.14, step: 0.01, desc: "Outer petal lean", example: 1.2 },
+          petalRadiusInner: { min: 0.0, max: 1.0, step: 0.01, desc: "Inner petal radius", example: 0.01 },
+          petalArrangement: { min: 0, max: 1, step: 1, desc: "0: ring, 1: spiral", example: 0 },
+          segments: { min: 1, max: 20, step: 1, desc: "Curve subdivisions", example: 6 }
+        }
+      };
+      const dwind = dom.$.div({ maxHeight$: "600px" });
+      
+      dom.sidebar$.appendChild(dwind);
+
+      function make_named_props(wa, opts) {
+        const ptr = opts.create();
+        const count = opts.count();
+
+        if (count !== opts.prop_names.length) {
+          console.warn(opts.label + ": prop name list in demo_global is out of sync with its C++ struct layout");
+        }
+
+        const f = wa.fp32_array(count, ptr); // ONE typed array over the whole (now unified) struct
+
+        const props = { ptr, preset_count: opts.preset_count(), needs_update: false };
+        const ui_updaters = [];
+        const whole_number_names = opts.whole_number_names || [];
+
+        // Each color_names entry (e.g. "barkColor") is really 3 slots in prop_names
+        // ("barkColorR"/"G"/"B") kept there so index math / the count sync-check above
+        // stay simple -- but a per-channel slider next to the composite color picker
+        // below is redundant now that the C++ side stores these as one number[3], so
+        // we still bind the property (the color picker's get/set below reads/writes
+        // it directly) but skip building a slider for it.
+        const suppressed_names = {};
+        (opts.color_names || []).forEach(function (name) {
+          suppressed_names[name + "R"] = true;
+          suppressed_names[name + "G"] = true;
+          suppressed_names[name + "B"] = true;
+        });
+
+        const preset_options = [dom.$.option({ value: -1 }, "-- Select Preset --")];
+        for (let j = 0; j < opts.preset_count(); j++) {
+          preset_options.push(dom.$.option({ value: j }, "Preset " + j));
+        }
+
+        const preset_selector = dom.$.select({
+          $style: "width:100%; margin-bottom: 10px;",
+          onchange: function () {
+            const preset_id = parseInt(this.value);
+            if (preset_id >= 0) {
+              opts.apply_preset(ptr, preset_id);
+              props.needs_update = true;
+              ui_updaters.forEach(fn => fn());
+            }
+          }
+        }, ...preset_options);
+
+        dwind.appendChild(
+          dom.$.div.collapseable({ heading: opts.label, class$: "collapsed" },
+            dom.$.div({ $style: "height:auto;max-height1:calc(100% - 20px);max-height:800px; overflow:hidden; overflow-y:auto" },
+              preset_selector,
+              opts.prop_names.map(function (name, idx) {
+                const whole = whole_number_names.indexOf(name) >= 0;
+                Object.defineProperty(props, name, {
+                  get: function () { return f[idx]; },
+                  set: function (v) { f[idx] = whole ? Math.round(v) : v; },
+                  enumerable: true,
+                });
+                if (suppressed_names[name]) return null; // covered by a color picker below instead
+
+                const range = (UI_RANGES[opts.label] && UI_RANGES[opts.label][name]) || { min: 0, max: 100, step: 1, desc: name };
+                const el = dom.$.value_slider(dom.$.div(range.desc || name), {
+                  value: props[name],
+                  min: range.min, max: range.max, step: range.step,
+                  oninput: function () {
+                    props[name] = this.value;
+                    props.needs_update = true;
+                  }
+                });
+                ui_updaters.push(function () {
+                  if (el.querySelectorAll) {
+                    const inputs = el.querySelectorAll('input');
+                    for (let k = 0; k < inputs.length; k++) {
+                      inputs[k].value = props[name];
+                    }
+                  }
+                });
+                return el;
+              }).filter(function (el) { return el; }),
+              (opts.color_names || []).map(function (name) {
+                Object.defineProperty(props, name, {
+                  get: function () { return [props[name + "R"], props[name + "G"], props[name + "B"], 255]; },
+                  set: function (v) { props[name + "R"] = v[0]; props[name + "G"] = v[1]; props[name + "B"] = v[2]; },
+                  enumerable: true,
+                });
+                const col = props[name];
+                const el = dom.$.color_input(dom.$.div(name), {
+                  multiplier: 255,
+                  value: col, oninput: function () {
+                    props[name] = col;
+                    props.needs_update = true;
+                  }
+                });
+                ui_updaters.push(function () {
+                  if (el.update_color) {
+                    el.update_color(props[name]);
+                  }
+                });
+                return el;
+              })
+            )
+          )
+        );
+
+
+        props.apply_preset = function (preset_id) {
+          opts.apply_preset(ptr, preset_id);
+        };
+
+        props.preset_selector = preset_selector;
+        props.ui_updaters = ui_updaters;
+
+        props.toJSON = function () {
+          const o = {};
+          opts.prop_names.forEach(function (n) { o[n] = props[n]; });
+          return o;
+        };
+
+        return props;
+      }
+
+      function make_named_props_object(wa, opts) {
+        const ptr = opts.create();
+        const count = opts.count();
+
+        if (count !== opts.prop_names.length) {
+          console.warn(opts.label + ": prop name list in demo_global is out of sync with its C++ struct layout");
+        }
+
+        const f = wa.fp32_array(count, ptr); // ONE typed array over the whole (now unified) struct
+
+        const props = { ptr, preset_count: opts.preset_count(), needs_update: false };
+
+        const whole_number_names = opts.whole_number_names || [];
+
+        const suppressed_names = {};
+        (opts.color_names || []).forEach(function (name) {
+          suppressed_names[name + "R"] = true;
+          suppressed_names[name + "G"] = true;
+          suppressed_names[name + "B"] = true;
+        });
+
+        const preset_options = [dom.$.option({ value: -1 }, "-- Select Preset --")];
+        for (let j = 0; j < opts.preset_count(); j++) {
+          preset_options.push(dom.$.option({ value: j }, "Preset " + j));
+        }
+
+
+        opts.prop_names.forEach(function (name, idx) {
+          const whole = whole_number_names.indexOf(name) >= 0;
+          Object.defineProperty(props, name, {
+            get: function () { return f[idx]; },
+            set: function (v) { f[idx] = whole ? Math.round(v) : v; },
+            enumerable: true,
+          });
+        });
+
+        (opts.color_names || []).forEach(function (name) {
+          Object.defineProperty(props, name, {
+            get: function () { return [props[name + "R"], props[name + "G"], props[name + "B"], 255]; },
+            set: function (v) { props[name + "R"] = v[0]; props[name + "G"] = v[1]; props[name + "B"] = v[2]; },
+            enumerable: true,
+          });
+
+        })
+
+
+
+        props.apply_preset = function (preset_id) {
+          opts.apply_preset(ptr, preset_id);
+        };
+
+
+        props.toJSON = function () {
+          const o = {};
+          opts.prop_names.forEach(function (n) { o[n] = props[n]; });
+          return o;
+        };
+
+        let max_verts = opts.estimate_max_verts(props.ptr) * 2;
+
+        const _positions = wa.fp32_array(max_verts * 3);
+        const _normals = wa.fp32_array(max_verts * 3);
+        const _uvs = wa.fp32_array(max_verts * 2);
+        const _colors = wa.fp32_array(max_verts * 4); // RGBA -- a_color is vec4 in the shader
+        const _interleaved = wa.fp32_array(max_verts * 12); // position(3) + normal(3) + uv(2) + color(4)
+
+
+        props.reset = function (def) {
+          opts.apply_preset(props.ptr, 0);
+          if (def) {
+            for (let k in def) {
+              props[k] = def[k];
+            }
+          }
+          return this;
+        };
+        props.create = function (geo) {
+          geo = geo || engine.create_geometry({
+            attr: {
+              a_position: { item_size: 3, stride: 12 * 4, offset: 0 },
+              a_normal: { item_size: 3, stride: 12 * 4, offset: 3 * 4 },
+              a_uv: { item_size: 2, stride: 12 * 4, offset: 6 * 4 },
+              a_color: { item_size: 4, stride: 12 * 4, offset: 8 * 4 }
+            }
+          });
+
+          const total = opts.regenerate(
+            props.ptr,
+            _positions.byteOffset,
+            _normals.byteOffset,
+            _uvs.byteOffset,
+            _colors.byteOffset,
+            max_verts
+          );
+
+          geo.draw_count = total;
+
+          const P = new Float32Array(wa.memory.buffer, _positions.byteOffset, total * 3);
+          const N = new Float32Array(wa.memory.buffer, _normals.byteOffset, total * 3);
+          const U = new Float32Array(wa.memory.buffer, _uvs.byteOffset, total * 2);
+          const C = new Float32Array(wa.memory.buffer, _colors.byteOffset, total * 4);
+          const I = new Float32Array(wa.memory.buffer, _interleaved.byteOffset, total * 12);
+
+          for (let i = 0; i < total; i++) {
+            const io = i * 12;
+            const po = i * 3;
+            const no = i * 3;
+            const uo = i * 2;
+            const co = i * 4;
+
+            I[io + 0] = P[po + 0];
+            I[io + 1] = P[po + 1];
+            I[io + 2] = P[po + 2];
+
+            I[io + 3] = N[no + 0];
+            I[io + 4] = N[no + 1];
+            I[io + 5] = N[no + 2];
+
+            I[io + 6] = U[uo + 0];
+            I[io + 7] = U[uo + 1];
+
+            I[io + 8] = C[co + 0];
+            I[io + 9] = C[co + 1];
+            I[io + 10] = C[co + 2];
+            I[io + 11] = C[co + 3];
+          }
+
+          wa.rdr_update_attribute_data(geo.attr.a_position, total * 12, _interleaved.byteOffset);
+
+          wa.rdr_set_geo_draw_count(geo.uuid, geo.draw_count);
+          return geo;
+        };
+        opts.apply_preset(props.ptr, 0);
+        return props;
+      }
+
+
+      function make_tree_props(wa) {
+        return make_named_props(wa, {
+          label: "tree_props",
+          create: wa.tree_props_create,
+          count: wa.tree_props_count,
+          preset_count: wa.tree_props_preset_count,
+          apply_preset: wa.tree_props_apply_preset,
+          prop_names: TREE_PROP_NAMES,
+          whole_number_names: TREE_WHOLE_NUMBER_NAMES,
+          color_names: TREE_COLOR_NAMES,
+        });
+      }
+
+      function make_plant_props(wa) {
+        return make_named_props(wa, {
+          label: "plant_props",
+          create: wa.plant_props_create,
+          count: wa.plant_props_count,
+          preset_count: wa.plant_props_preset_count,
+          apply_preset: wa.plant_props_apply_preset,
+          prop_names: PLANT_PROP_NAMES,
+          whole_number_names: PLANT_WHOLE_NUMBER_NAMES,
+          color_names: PLANT_COLOR_NAMES,
+        });
+      }
+
+      function make_rich_plant_props(wa) {
+        return make_named_props(wa, {
+          label: "rich_plant_props",
+          create: wa.rich_plant_props_create,
+          count: wa.rich_plant_props_count,
+          preset_count: wa.rich_plant_props_preset_count,
+          apply_preset: wa.rich_plant_props_apply_preset,
+          prop_names: RICH_PLANT_PROP_NAMES,
+          whole_number_names: RICH_PLANT_WHOLE_NUMBER_NAMES,
+          color_names: RICH_PLANT_COLOR_NAMES,
+        });
+      }
+
+
+      function make_plant_props_object(wa) {
+        return make_named_props_object(wa, {
+          label: "plant_props",
+          create: wa.plant_props_create,
+          regenerate: wa.plant_generate,
+          count: wa.plant_props_count,
+          estimate_max_verts: wa.plant_estimate_max_verts,
+          preset_count: wa.plant_props_preset_count,
+          apply_preset: wa.plant_props_apply_preset,
+          prop_names: PLANT_PROP_NAMES,
+          whole_number_names: PLANT_WHOLE_NUMBER_NAMES,
+          color_names: PLANT_COLOR_NAMES,
+        });
+      }
+
+      function make_plant_props_custom_object(wa) {
+        return make_named_props_object(wa, {
+          label: "plant_props",
+          create: wa.plant_props_create,
+          regenerate: wa.plant_generate_custom,
+          count: wa.plant_props_count,
+          estimate_max_verts: wa.plant_estimate_max_verts,
+          preset_count: wa.plant_props_preset_count,
+          apply_preset: wa.plant_props_apply_preset,
+          prop_names: PLANT_PROP_NAMES,
+          whole_number_names: PLANT_WHOLE_NUMBER_NAMES,
+          color_names: PLANT_COLOR_NAMES,
+        });
+      }
+
+
+      function test1() {
+        const tree = make_tree_props(wa);
+
+        console.log(tree);
+        let max_verts = 0;
+
+        max_verts = Math.ceil(max_verts * 4.0 + 10000); // large headroom for JSON presets and live tweaks
+
+        const positions = wa.fp32_array(max_verts * 3);
+        const normals = wa.fp32_array(max_verts * 3);
+        const uvs = wa.fp32_array(max_verts * 2);
+        const colors = wa.fp32_array(max_verts * 4); // RGBA -- a_color is vec4 in the shader
+        const trunk_count_buf = wa.u32_array(1);
+        
+
+        const gg = engine.create_geometry();
+        gg.positions = engine.geometry_set_attr({ item_size: 3 });
+        gg.normals = engine.geometry_set_attr({ item_size: 3 });
+        gg.uvs = engine.geometry_set_attr({ item_size: 2 });
+        gg.colors = engine.geometry_set_attr({ item_size: 4 });
+
+        gg.attr.a_position = gg.positions.uuid;
+        gg.attr.a_normal = gg.normals.uuid;
+        gg.attr.a_uv = gg.uvs.uuid;
+        gg.attr.a_color = gg.colors.uuid;
+
+
+        function update_tree() {
+          //tree.apply_preset(0);
+
+          const total = wa.tree_generate(
+            tree.ptr,
+            positions.byteOffset,
+            normals.byteOffset,
+            uvs.byteOffset,
+            colors.byteOffset,
+            max_verts,
+            trunk_count_buf.byteOffset
+          );
+
+          tree.gg = gg;
+          engine.geometry_set_attr(gg.positions, positions, total * 3);
+          engine.geometry_set_attr(gg.normals, normals, total * 3);
+          engine.geometry_set_attr(gg.uvs, uvs, total * 2);
+          engine.geometry_set_attr(gg.colors, colors, total * 4);
+          gg.trunk_count = trunk_count_buf[0];
+          gg.twig_count = total - gg.trunk_count;
+        }
+
+
+        update_tree();
+
+        const mat = engine.materials.create({
+          wireframe: !true, compiler: "pbr",
+          props : {
+            enable_vertex_color: true,
+          },
+          uniforms: {
+            u_baryframe_opacity: 0.15,
+            u_baryframe_width1: 0.5,
+          }
+        });
+
+
+        function render_scene() {
+
+          if (tree.needs_update) {
+            tree.needs_update = false;
+            update_tree();
+          }
+          engine.render_item(gg, mat, 0, gg.trunk_count, 0);
+
+
+          engine.debug.render();
+        }
+
+
+        const scr = engine.deffered_rendering({
+          camera: scene.camera,
+          dlight0: scene.dlight0,
+          ENABLE_ATMOSPHERE: !true,
+          ENABLE_SHADOWS: true,
+          ENABLE_LOGDEPTH:false,
+        });
+
+        //scr.enabled = false;
+
+        scr.on_shadowmap = function (time, time_delta) {
+          render_scene();
+        };
+        scr.on_frame = function (time, time_delta) {
+          engine.debug.grid.render_plane();
+          render_scene();
+        };
+
+
+
+      }
+
+
+
+      test1();
+
+    }
+
+    suit0();
+
+    
+
+  }
+
+  engine({})(ready);
+});
