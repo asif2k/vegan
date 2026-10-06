@@ -483,6 +483,18 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
       }
 
 
+      // anti-aliasing selector for a deferred_rendering screen (none / fxaa / taa); ?aa=taa picks the initial mode
+      function antialias_controls(scr) {
+        const want = (new URLSearchParams(location.search)).get("aa");
+        if (want) scr.antialias = want;
+        const aa_select = dom.$.select({
+          $style: "width:100%; margin-bottom: 6px;",
+          onchange: function () { scr.antialias = this.value; },
+        }, dom.$.option({ value: "none" }, "Anti-aliasing: none"), dom.$.option({ value: "fxaa" }, "Anti-aliasing: FXAA"), dom.$.option({ value: "taa" }, "Anti-aliasing: TAA"));
+        aa_select.value = scr.antialias;
+        dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px" }, aa_select), dom.sidebar$.firstChild);
+      }
+
       function test1() {
         const tree = make_tree_props(wa);
 
@@ -629,6 +641,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         });
 
         //scr.enabled = false;
+        antialias_controls(scr);
 
         scr.on_shadowmap = function (time, time_delta) {
           render_scene();
@@ -838,6 +851,7 @@ void vertex(){
           ENABLE_SHADOWS: true,
           ENABLE_LOGDEPTH: false,
         });
+        antialias_controls(scr);
         scr.on_shadowmap = function (time, time_delta) { render_scene(); };
         scr.on_frame = function (time, time_delta) { render_scene(); };
       }

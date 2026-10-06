@@ -1352,8 +1352,10 @@ void fragment(){
       mat.deffered_mat = engine.materials.clone(mat, {
         shader: `
 ${(ENABLE_LOGDEPTH ? '#define ENABLE_LOGDEPTH' : '')}
+uniform vec2 u_taa_jitter;   // sub-pixel projection offset in NDC (zero unless TAA is on); only G-buffer passes get it
 void vertex(){
 super_vertex();
+gl_Position.xy += u_taa_jitter * gl_Position.w;
 }
 layout(location=1) out vec4 frag_position;
 layout(location=2) out vec4 frag_normal;
@@ -1624,6 +1626,185 @@ void fragment(){
 `
   });
 
+  // ---------------------------------------------------------------------------------------------
+  // Anti-aliasing. The deferred pipeline cannot use MSAA, so the lit image is drawn to an offscreen target
+  // and resolved to the canvas by one of:
+  //   "none"  the lit image goes straight to the canvas (as before)
+  //   "fxaa"  single-pass edge-directed blur on the final (tonemapped) colours: cheap, softens aliased edges,
+  //           but cannot recover a sub-pixel feature that no pixel happened to hit
+  //   "taa"   temporal: the projection is jittered by a sub-pixel Halton offset each frame, every frame is
+  //           blended into a history target after reprojecting it with last frame's view-projection matrix
+  //           (the G-buffer stores the world position of each pixel, so reprojection needs no depth maths),
+  //           and the history is clamped to the colour range of the current 3x3 neighbourhood to limit ghosting.
+  //           Thin geometry (grass, twigs) gets accumulated coverage instead of flickering in and out.
+  // screen.antialias can be changed at any time.
+  screen.antialias = def.ANTIALIAS || "none";
+  screen.taa_feedback = 0.9;      // weight of the history in the blend (0 = no accumulation)
+  screen.taa_sharpen = 0.25;      // TAA softens; a light unsharp mask on the output gives some of it back
+  const aa_lit = engine.render_targets.create({ width: 1, height: 1, color: { filter: GL_LINEAR } });
+  const aa_hist = [0, 1].map(function () {
+    return engine.render_targets.create({ width: 1, height: 1, color: { filter: GL_LINEAR, internal_format: GL_RGBA16F, format_type: GL_HALF_FLOAT } });
+  });
+  const aa_jitter = new Float32Array(2);
+  const aa_prev_vp = new Float32Array(16), aa_last_vp = new Float32Array(16);
+  const aa_taa_params = new Float32Array(3);                   // feedback, sharpen, (unused)
+  engine.uniforms.set("u_taa_jitter", aa_jitter);
+  let aa_index = 0, aa_frame = 0, aa_reset = true, aa_w = 0, aa_h = 0, aa_mode_prev = "none";
+
+  function halton(i, b) {
+    let f = 1, r = 0;
+    while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); }
+    return r;
+  }
+
+  const aa_blit_mat = engine.materials.clone(engine.render_texture.mat, {
+    uniforms: { u_taa_params: aa_taa_params },
+    shader: `
+uniform vec2 u_render_size;
+uniform vec3 u_taa_params;
+varying vec2 v_uv;
+void fragment(){
+    vec2 px = 1.0 / u_render_size;
+    vec3 c = texture(u_render_texture_texture, v_uv).rgb;
+    vec3 blur = (texture(u_render_texture_texture, v_uv + vec2(px.x, 0.0)).rgb + texture(u_render_texture_texture, v_uv - vec2(px.x, 0.0)).rgb
+               + texture(u_render_texture_texture, v_uv + vec2(0.0, px.y)).rgb + texture(u_render_texture_texture, v_uv - vec2(0.0, px.y)).rgb) * 0.25;
+    gl_FragColor = vec4(max(c + (c - blur) * u_taa_params.y, 0.0), 1.0);
+}`
+  });
+
+  const aa_fxaa_mat = engine.materials.clone(engine.render_texture.mat, {
+    shader: `
+uniform vec2 u_render_size;
+varying vec2 v_uv;
+// FXAA (after T. Lottes): find the local edge direction from the luma of the four diagonal neighbours and blur along it
+vec3 fxaa(sampler2D tex, vec2 uv, vec2 texel) {
+    const float REDUCE_MIN = 1.0 / 128.0, REDUCE_MUL = 1.0 / 8.0, SPAN_MAX = 8.0;
+    vec3 rgbNW = texture(tex, uv + vec2(-1.0, -1.0) * texel).rgb;
+    vec3 rgbNE = texture(tex, uv + vec2( 1.0, -1.0) * texel).rgb;
+    vec3 rgbSW = texture(tex, uv + vec2(-1.0,  1.0) * texel).rgb;
+    vec3 rgbSE = texture(tex, uv + vec2( 1.0,  1.0) * texel).rgb;
+    vec3 rgbM  = texture(tex, uv).rgb;
+    const vec3 luma = vec3(0.299, 0.587, 0.114);
+    float lumaNW = dot(rgbNW, luma), lumaNE = dot(rgbNE, luma), lumaSW = dot(rgbSW, luma), lumaSE = dot(rgbSE, luma), lumaM = dot(rgbM, luma);
+    float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+    float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+    vec2 dir;
+    dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+    dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+    float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * REDUCE_MUL), REDUCE_MIN);
+    float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+    dir = min(vec2(SPAN_MAX), max(vec2(-SPAN_MAX), dir * rcpDirMin)) * texel;
+    vec3 rgbA = 0.5 * (texture(tex, uv + dir * (1.0 / 3.0 - 0.5)).rgb + texture(tex, uv + dir * (2.0 / 3.0 - 0.5)).rgb);
+    vec3 rgbB = rgbA * 0.5 + 0.25 * (texture(tex, uv + dir * -0.5).rgb + texture(tex, uv + dir * 0.5).rgb);
+    float lumaB = dot(rgbB, luma);
+    return (lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB;
+}
+void fragment(){
+    gl_FragColor = vec4(fxaa(u_render_texture_texture, v_uv, 1.0 / u_render_size), 1.0);
+}`
+  });
+
+  const aa_taa_mat = engine.materials.clone(engine.render_texture.mat, {
+    uniforms: {
+      frag_position: screen.frag_position,
+      frag_normal: screen.frag_normal,
+      u_taa_prev_vp: aa_prev_vp,
+      u_taa_params: aa_taa_params,
+      u_taa_history: aa_hist[0].color,
+    },
+    shader: `
+uniform sampler2D frag_position;
+uniform sampler2D frag_normal;
+uniform sampler2D u_taa_history;
+uniform mat4 u_taa_prev_vp;
+uniform mat4 u_inverse_view_projection_matrix;
+uniform vec3 u_camera_position;
+uniform vec3 u_taa_params;      // x: history weight
+uniform vec2 u_render_size;
+varying vec2 v_uv;
+void fragment(){
+    vec2 px = 1.0 / u_render_size;
+    vec3 c = texture(u_render_texture_texture, v_uv).rgb;
+    // colour range of the 3x3 neighbourhood (mean +- 1.25 sigma, inside the min/max box)
+    vec3 m1 = vec3(0.0), m2 = vec3(0.0), mn = c, mx = c;
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            vec3 s = texture(u_render_texture_texture, v_uv + vec2(float(x), float(y)) * px).rgb;
+            m1 += s; m2 += s * s; mn = min(mn, s); mx = max(mx, s);
+        }
+    }
+    vec3 mean = m1 / 9.0, sigma = sqrt(max(m2 / 9.0 - mean * mean, 0.0));
+    vec3 lo = max(mn, mean - 1.25 * sigma), hi = min(mx, mean + 1.25 * sigma);
+
+    bool is_sky = length(texture(frag_normal, v_uv).rgb) < 0.1;
+    vec3 result = c;
+    if (u_taa_params.x > 0.0) {
+        vec4 pc;
+        if (is_sky) {
+            // nothing was drawn here: reproject the view ray as a direction at infinity (w = 0), so a pixel that is
+            // sometimes sky and sometimes a thin blade accumulates the right mix instead of flickering
+            vec4 far_pt = u_inverse_view_projection_matrix * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
+            pc = u_taa_prev_vp * vec4(normalize(far_pt.xyz / far_pt.w - u_camera_position), 0.0);
+        }
+        else {
+            pc = u_taa_prev_vp * vec4(texture(frag_position, v_uv).rgb, 1.0);
+        }
+        vec2 huv = pc.xy / pc.w * 0.5 + 0.5;
+        if (pc.w > 0.0 && huv.x > 0.0 && huv.x < 1.0 && huv.y > 0.0 && huv.y < 1.0) {
+            vec3 hist = clamp(texture(u_taa_history, huv).rgb, lo, hi);
+            float motion = length((huv - v_uv) * u_render_size);                  // pixels moved since last frame
+            float w = u_taa_params.x * (1.0 - 0.6 * smoothstep(0.5, 8.0, motion));    // trust the history less while moving
+            result = mix(c, hist, w);
+        }
+    }
+    gl_FragColor = vec4(result, 1.0);
+}`
+  });
+
+  // the jitter / bookkeeping that has to happen once per frame, before anything is queued
+  function aa_begin_frame() {
+    const mode = screen.antialias;
+    const w = engine.render_width, h = engine.render_height;
+    if (mode !== aa_mode_prev || w !== aa_w || h !== aa_h) aa_reset = true;     // the history is not valid any more
+    aa_mode_prev = mode; aa_w = w; aa_h = h;
+    if (mode === "taa" && w > 0 && h > 0) {
+      const i = (aa_frame % 8) + 1;
+      aa_jitter[0] = (halton(i, 2) - 0.5) * 2.0 / w;
+      aa_jitter[1] = (halton(i, 3) - 0.5) * 2.0 / h;
+    }
+    else { aa_jitter[0] = 0; aa_jitter[1] = 0; }
+    aa_frame++;
+  }
+
+  // draws the lit image and resolves it to the canvas according to screen.antialias
+  function aa_resolve() {
+    const mode = screen.antialias;
+    if (mode !== "fxaa" && mode !== "taa") {
+      engine.render_texture(screen.depth, 0, 0, 1, 1, screen.output);
+      return;
+    }
+    engine.push_render_target(aa_lit, true);
+    engine.render_texture(screen.depth, 0, 0, 1, 1, screen.output);
+    engine.pop_render_target();
+    if (mode === "fxaa") {
+      engine.render_texture(aa_lit.color, 0, 0, 1, 1, aa_fxaa_mat);
+      return;
+    }
+    // TAA: aa_hist[aa_index] receives the resolved frame, aa_hist[1 - aa_index] holds the previous one
+    const prev = aa_hist[1 - aa_index], next = aa_hist[aa_index];
+    aa_taa_mat.uniforms.u_taa_history = prev.color;
+    aa_taa_params[0] = aa_reset ? 0 : screen.taa_feedback;
+    aa_taa_params[1] = screen.taa_sharpen;
+    aa_prev_vp.set(aa_last_vp);                          // last frame's view-projection, unjittered (read when the frame is flushed)
+    aa_last_vp.set(cam.view_projection_matrix);
+    engine.push_render_target(next, false);
+    engine.render_texture(aa_lit.color, 0, 0, 1, 1, aa_taa_mat);
+    engine.pop_render_target();
+    engine.render_texture(next.color, 0, 0, 1, 1, aa_blit_mat);
+    aa_index = 1 - aa_index;
+    aa_reset = false;
+  }
+
   screen.on_frame = function (time, time_delta) { };
   screen.on_after_frame = function (time, time_delta) { };
   screen.on_shadowmap = function (time, time_delta) { };
@@ -1644,6 +1825,7 @@ void fragment(){
   const spos = [0, 0, 0];
   engine.on_frame_begin.add(function (time, time_delta) {
     if (screen.enabled == false) return;
+    aa_begin_frame();
     if (ENABLE_SHADOWS) {
       for (const cascade of screen.cascades) {
         const scam = cascade.camera;        
@@ -1695,7 +1877,7 @@ void fragment(){
     }
 
     engine.pop_render_target();
-    engine.render_texture(screen.depth, 0, 0, 1, 1, screen.output);
+    aa_resolve();
     screen.on_after_frame(time, time_delta);
 
   });
