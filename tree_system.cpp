@@ -21,7 +21,7 @@
 #define TREE_PRESET_COUNT   1
 #define TREE_FRUIT_VERTS_PER_UNIT 156 // 6x5 UV-sphere (144 verts) + 12-vert stem quad
 
-#define TREE_PROPS_COUNT 37
+#define TREE_PROPS_COUNT 41
 
 
 
@@ -77,6 +77,16 @@ struct tree_props {
     number rootFlare;         // buttress/flare widening at the trunk base, 0 = none
     number twigAngleJitter;   // radians, random extra rotation of the twig plane
     number fruitClusterCount; // fruits grown per twig when fruitChance hits (grape/cherry clusters)
+    // ---- per-branch variation (every one defaults to 0 = an exact no-op) ----
+    // Without these the skeleton is a fixed pattern: every fork has two children, a limb is its
+    // parent's length times lengthFalloffFactor, side limbs along the trunk turn by a constant
+    // angle (twistRate), and the noise-driven value only nudges the direction a little, so trees
+    // of one species look alike for any seed. Each knob below draws its own independent,
+    // seed-dependent random number per branch (tree_jit) and spreads it by that amount.
+    number lengthJitter;      // 0..0.9  fractional +/- spread of each branch's length
+    number radiusJitter;      // 0..0.5  fractional +/- spread of each side branch's radius
+    number azimuthJitter;     // radians, random extra turn of a side limb around its parent
+    number elevationJitter;   // random extra up/down tilt of a side limb (a direction offset, ~0..1)
 };
 
 struct tree_branch {
@@ -126,6 +136,10 @@ static void tree_props_set_default(tree_props* p) {
     p->rootFlare = 0.0f;
     p->twigAngleJitter = 0.0f;
     p->fruitClusterCount = 1.0f;
+    p->lengthJitter = 0.0f;
+    p->radiusJitter = 0.0f;
+    p->azimuthJitter = 0.0f;
+    p->elevationJitter = 0.0f;
 }
 
 // Species are defined entirely in species_catalog_2.json now -- this is the only
@@ -159,6 +173,14 @@ static inline void tree_props_clamp(tree_props* p) {
     if (p->levels > TREE_MAX_LEVELS) p->levels = TREE_MAX_LEVELS;
     if (p->fruitClusterCount < 1.0f) p->fruitClusterCount = 1.0f;
     if (p->fruitClusterCount > 4.0f) p->fruitClusterCount = 4.0f;
+    if (p->lengthJitter < 0.0f) p->lengthJitter = 0.0f;
+    if (p->lengthJitter > 0.9f) p->lengthJitter = 0.9f;   // keeps 1 + jitter > 0 so a branch never flips or vanishes
+    if (p->radiusJitter < 0.0f) p->radiusJitter = 0.0f;
+    if (p->radiusJitter > 0.5f) p->radiusJitter = 0.5f;
+    if (p->azimuthJitter < 0.0f) p->azimuthJitter = 0.0f;
+    if (p->azimuthJitter > 3.14f) p->azimuthJitter = 3.14f;
+    if (p->elevationJitter < 0.0f) p->elevationJitter = 0.0f;
+    if (p->elevationJitter > 1.5f) p->elevationJitter = 1.5f;
 }
 
 // ----------------------------------------------------------------------------
@@ -204,6 +226,46 @@ static inline void tree_mirror(number* out, const number* vec, const number* nor
     out[2] = vec[2] - m_v[2] * m_s;
 }
 
+// Independent per-branch random number in [-1, 1] for the jitter knobs. veg_rand3 is smooth
+// noise sampled at integer lattice points, so neighbouring branches get nearly the same value;
+// that is what direction wants but not jitter, which needs real hash scatter. `stream` makes
+// each use of a branch's random numbers independent of the others.
+static inline number tree_jit(const tree_props* props, number a, number b, number c, number stream) {
+    return hash_3d(a + stream * 3.1f, b + stream * 0.7f, c + stream * 1.7f, props->seed + stream * 11.0f);
+}
+
+// A fork whose two child directions are (almost) the same makes the ring math degenerate:
+// cross(axis1, axis2) collapses to ~0, the normalize divides by zero and every vertex after it
+// is NaN. Seen with clumpMax ~0.98 together with branchFactor <= 1.5. "Almost" is judged by
+// sin^2 of the angle between them. Tight forks of a fraction of a degree are legitimate (the
+// brush of near-parallel twigs at a limb tip; sin^2 there is >= ~3e-8) and must come out exactly
+// as they always did, while the broken ones sit at 1e-8 and below (down to ~1e-11).
+#define TREE_MIN_FORK_SIN2 1e-8f
+
+static inline bool tree_nearly_parallel(const number* a, const number* b) {
+    number c[3]; v3_cross(c, a, b);
+    return v3_dot(a, b) > 0.0f && v3_len_sq(c) < TREE_MIN_FORK_SIN2;
+}
+
+// Any unit vector perpendicular to a (a is unit length).
+static inline void tree_any_perp(number* out, const number* a) {
+    number ref[3] = { 0.0f, 1.0f, 0.0f };
+    if (a[1] > 0.9f || a[1] < -0.9f) { ref[0] = 1.0f; ref[1] = 0.0f; }
+    v3_cross(out, a, ref); v3_normalize(out, out);
+}
+
+// Swing two (near-)identical unit directions apart. A no-op for any pair that is not degenerate
+// (see tree_nearly_parallel), so ordinary trees come out exactly as before.
+static inline void tree_separate(number* a, number* b) {
+    for (int it = 0; it < 12 && tree_nearly_parallel(a, b); it++) {
+        number p[3]; number d = v3_dot(a, b);
+        p[0] = b[0] - a[0] * d; p[1] = b[1] - a[1] * d; p[2] = b[2] - a[2] * d;
+        if (v3_len_sq(p) < 1e-6f) tree_any_perp(p, a); else v3_normalize(p, p);   // too short to trust its direction
+        a[0] -= p[0] * 0.12f; a[1] -= p[1] * 0.12f; a[2] -= p[2] * 0.12f; v3_normalize(a, a);
+        b[0] += p[0] * 0.12f; b[1] += p[1] * 0.12f; b[2] += p[2] * 0.12f; v3_normalize(b, b);
+    }
+}
+
 // ----------------------------------------------------------------------------
 // skeleton growth
 // ----------------------------------------------------------------------------
@@ -243,6 +305,8 @@ static void tree_split_branch(tree_props* props, tree_branch* branches, int32_t*
     number dir[3]; v3_sub(dir, so, po); v3_normalize(dir, dir);
     number normal[3] = { dir[2], dir[0], dir[1] };
     { number tmp[3]; v3_cross(tmp, dir, normal); v3_copy(normal, tmp); }
+    // the permutation trick above is parallel to dir (so normal -> 0) for a dir along (1,1,1)
+    if (v3_len_sq(normal) < 1e-6f) tree_any_perp(normal, dir);
     number tangent[3]; v3_cross(tangent, dir, normal);
 
     int rLevel = (int)props->levels - level;
@@ -275,10 +339,31 @@ static void tree_split_branch(tree_props* props, tree_branch* branches, int32_t*
 
     if (r > 0.5f) { number t[3]; v3_copy(t, newdir); v3_copy(newdir, newdir2); v3_copy(newdir2, t); }
 
+    // random turn of each child around the parent's axis (side-limb azimuth, plain-recursion case)
+    if (steps == 0 && props->azimuthJitter > 0.0f) {
+        number rot[3];
+        tree_axis_angle(rot, newdir, dir, tree_jit(props, (number)rLevel, (number)l1, (number)l2, 1.0f) * props->azimuthJitter); v3_copy(newdir, rot);
+        tree_axis_angle(rot, newdir2, dir, tree_jit(props, (number)rLevel, (number)l1, (number)l2, 2.0f) * props->azimuthJitter); v3_copy(newdir2, rot);
+    }
+
+    // along the trunk chain (steps > 0) child0 is overwritten below by a near-vertical "kink" head,
+    // so only the side limb (newdir2) matters; it must also stay clear of that chain direction
+    number chain_kink[3] = { 0.0f, 1.0f, 0.0f };
+    const bool on_chain = (level > 0 && steps > 0);
+    if (on_chain) {
+        chain_kink[0] = (r - 0.5f) * 2.0f * props->trunkKink;
+        chain_kink[1] = props->climbRate;
+        chain_kink[2] = (r - 0.5f) * 2.0f * props->trunkKink;
+        v3_normalize(chain_kink, chain_kink);
+    }
+    number chain_angle = 0.0f;
+
     if (steps > 0) {
         number angle = (number)steps / (number)props->treeSteps * TWO_PI_F * props->twistRate;
+        angle += tree_jit(props, (number)rLevel, (number)l1, (number)l2, 3.0f) * props->azimuthJitter;
+        chain_angle = angle;
         newdir2[0] = wsin(angle);
-        newdir2[1] = r;
+        newdir2[1] = r + tree_jit(props, (number)rLevel, (number)l1, (number)l2, 4.0f) * props->elevationJitter;
         newdir2[2] = wcos(angle);
         v3_normalize(newdir2, newdir2);
     }
@@ -287,8 +372,24 @@ static void tree_split_branch(tree_props* props, tree_branch* branches, int32_t*
     number dropAmount = (number)rLevel * props->dropAmount;
     number sweepAmount = (number)rLevel * props->sweepAmount;
     number off[3] = { sweepAmount, dropAmount + growAmount, 0.0f };
-    v3_add(newdir, newdir, off); v3_normalize(newdir, newdir);
-    v3_add(newdir2, newdir2, off); v3_normalize(newdir2, newdir2);
+    number off0[3] = { off[0], off[1], off[2] }, off1[3] = { off[0], off[1], off[2] };
+    if (steps == 0 && props->elevationJitter > 0.0f) {   // (on the chain the tilt jitter is already in newdir2 above)
+        off0[1] += tree_jit(props, (number)rLevel, (number)l1, (number)l2, 5.0f) * props->elevationJitter;
+        off1[1] += tree_jit(props, (number)rLevel, (number)l1, (number)l2, 6.0f) * props->elevationJitter;
+    }
+    v3_add(newdir, newdir, off0); v3_normalize(newdir, newdir);
+    v3_add(newdir2, newdir2, off1); v3_normalize(newdir2, newdir2);
+
+    if (on_chain) {
+        // keep the side limb off the trunk direction (see tree_nearly_parallel) by swinging it outwards
+        for (int it = 0; it < 8 && tree_nearly_parallel(newdir2, chain_kink); it++) {
+            newdir2[0] += wsin(chain_angle) * 0.35f; newdir2[2] += wcos(chain_angle) * 0.35f;
+            v3_normalize(newdir2, newdir2);
+        }
+    }
+    else {
+        tree_separate(newdir, newdir2);
+    }
 
     number head0[3], head1[3], scaled[3];
     v3_scale(scaled, newdir, branches[bi].length); v3_add(head0, so, scaled);
@@ -302,15 +403,17 @@ static void tree_split_branch(tree_props* props, tree_branch* branches, int32_t*
     branches[bi].child1 = child1;
 
     number lenPow = wpow(branches[bi].length, props->lengthFalloffPower);
-    branches[child0].length = lenPow * props->lengthFalloffFactor;
-    branches[child1].length = lenPow * props->lengthFalloffFactor;
+    number lenJit0 = 1.0f + tree_jit(props, (number)rLevel, (number)l1, (number)l2, 7.0f) * props->lengthJitter;
+    number lenJit1 = 1.0f + tree_jit(props, (number)rLevel, (number)l1, (number)l2, 8.0f) * props->lengthJitter;
+    branches[child0].length = lenPow * props->lengthFalloffFactor * lenJit0;
+    branches[child1].length = lenPow * props->lengthFalloffFactor * lenJit1;
 
     if (level > 0) {
         if (steps > 0) {
             number kink[3] = { (r - 0.5f) * 2.0f * props->trunkKink, props->climbRate, (r - 0.5f) * 2.0f * props->trunkKink };
             v3_add(branches[child0].head, branches[bi].head, kink);
             branches[child0].type = 1;
-            branches[child0].length = branches[bi].length * props->taperRate;
+            branches[child0].length = branches[bi].length * props->taperRate * lenJit0;
             tree_split_branch(props, branches, branch_count, child0, level, steps - 1, l1 + 1, l2);
         } else {
             tree_split_branch(props, branches, branch_count, child0, level - 1, 0, l1 + 1, l2);
@@ -516,8 +619,17 @@ static void tree_create_forks(tree_build_ctx* ctx, int32_t bi, number radius) {
             ctx->ring_pool[ring_base + segments * 2 + i] = ring2[i];
         }
 
-        tree_create_forks(ctx, child0, branches[child0].type == 1 ? radius * props->taperRate : radius * props->radiusFalloffRate);
-        tree_create_forks(ctx, child1, radius * props->radiusFalloffRate);
+        // side branches only (the trunk chain keeps its smooth taper); never thicker than the parent
+        number rj0 = 1.0f + tree_jit(props, (number)bi, 11.0f, 5.0f, 9.0f) * props->radiusJitter;
+        number rj1 = 1.0f + tree_jit(props, (number)bi, 13.0f, 5.0f, 10.0f) * props->radiusJitter;
+        number rc0 = branches[child0].type == 1 ? radius * props->taperRate : radius * props->radiusFalloffRate * rj0;
+        number rc1 = radius * props->radiusFalloffRate * rj1;
+        if (props->radiusJitter > 0.0f) {
+            if (rc0 > radius * 0.98f && branches[child0].type != 1) rc0 = radius * 0.98f;
+            if (rc1 > radius * 0.98f) rc1 = radius * 0.98f;
+        }
+        tree_create_forks(ctx, child0, rc0);
+        tree_create_forks(ctx, child1, rc1);
 
     } else {
         int32_t vi = tree_push_vert(ctx, b->head, branch_color);

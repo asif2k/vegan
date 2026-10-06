@@ -22,6 +22,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         "fruitChance", "fruitSize", "fruitColorR", "fruitColorG", "fruitColorB",
         "treeSteps", "segments", "levels",
         "rootFlare", "twigAngleJitter", "fruitClusterCount",
+        "lengthJitter", "radiusJitter", "azimuthJitter", "elevationJitter",
       ];
       const TREE_WHOLE_NUMBER_NAMES = [
         "treeSteps", "segments", "levels", "fruitClusterCount",
@@ -88,7 +89,11 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           fruitSize: { min: 0.01, max: 2.0, step: 0.01, desc: "Size of fruit", example: 0.5 },
           rootFlare: { min: 0.0, max: 2.0, step: 0.01, desc: "Root flare / buttress widening", example: 0.0 },
           twigAngleJitter: { min: 0.0, max: 1.57, step: 0.01, desc: "Random twig-plane rotation (radians)", example: 0.0 },
-          fruitClusterCount: { min: 1, max: 4, step: 1, desc: "Fruits per twig (grape/cherry clusters)", example: 1 }
+          fruitClusterCount: { min: 1, max: 4, step: 1, desc: "Fruits per twig (grape/cherry clusters)", example: 1 },
+          lengthJitter: { min: 0.0, max: 0.9, step: 0.01, desc: "Random length variation per branch (+/- fraction)", example: 0.0 },
+          radiusJitter: { min: 0.0, max: 0.5, step: 0.01, desc: "Random thickness variation per side branch (+/- fraction)", example: 0.0 },
+          azimuthJitter: { min: 0.0, max: 3.14, step: 0.01, desc: "Random extra turn of side limbs around the trunk (radians)", example: 0.0 },
+          elevationJitter: { min: 0.0, max: 1.5, step: 0.01, desc: "Random extra up/down tilt of side limbs", example: 0.0 }
         },
         plant_props: {
           bladeLength: { min: 0.01, max: 3.0, step: 0.01, desc: "Length of blade", example: 0.35 },
