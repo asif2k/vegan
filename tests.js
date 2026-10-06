@@ -123,7 +123,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         },
         rich_plant_props: {
           stemLength: { min: 0.1, max: 5.0, step: 0.01, desc: "Length of stem", example: 1.0 },
-          stemWidth: { min: 0.01, max: 0.5, step: 0.01, desc: "Width of stem", example: 0.05 },
+          stemWidth: { min: 0.002, max: 0.5, step: 0.001, desc: "Width of stem", example: 0.05 },
           stemLean: { min: 0.0, max: 3.14, step: 0.01, desc: "Tilt from vertical", example: 0.1 },
           stemCurve: { min: -1.0, max: 1.0, step: 0.01, desc: "Forward bow", example: 0.1 },
           leafLength: { min: 0.01, max: 3.0, step: 0.01, desc: "Length of leaves", example: 0.3 },
@@ -136,7 +136,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           leafOutwardAngle: { min: 0.0, max: 3.14, step: 0.01, desc: "Angle outward from stem", example: 1.0 },
           leafOutwardVariance: { min: 0.0, max: 3.14, step: 0.01, desc: "Variance of outward angle", example: 0.2 },
           petalLength: { min: 0.01, max: 2.0, step: 0.01, desc: "Length of petals", example: 0.2 },
-          petalWidth: { min: 0.01, max: 1.0, step: 0.01, desc: "Width of petals", example: 0.1 },
+          petalWidth: { min: 0.003, max: 1.0, step: 0.001, desc: "Width of petals", example: 0.1 },
           petalTipTaper: { min: 0.0, max: 1.0, step: 0.01, desc: "Taper at petal tip", example: 0.1 },
           petalCurl: { min: -1.0, max: 1.0, step: 0.01, desc: "Curl of petals", example: 0.2 },
           flowerRadius: { min: 0.0, max: 1.0, step: 0.01, desc: "Radius of flower center", example: 0.05 },
@@ -644,7 +644,180 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
 
 
 
-      test1();
+      // ---------------------------------------------------------------------------------------------
+      // plants and grass (plant_system.cpp), loaded with  ?scene=plants[&habitat=<id>]
+      //
+      // plant_generate makes blade plants (grass, rosettes, ferns) and rich_plant_generate makes a stem with
+      // leaves and a flower. plant_presets.json holds a catalog of both; every plant is generated with a few
+      // seeds, uploaded once as an engine geometry, and then scattered over a habitat with instancing: the
+      // geometry holds one plant and a per-instance position attribute (divisor 1) places the copies.
+      function plants_test() {
+        const plant_binder = make_plant_props(wa);        // flat float-block binders over the C++ structs (also give the sliders)
+        const rich_binder = make_rich_plant_props(wa);
+
+        // plant_estimate_max_verts ignores the flower / ear geometry that flowerChance adds, so don't size from it
+        const MAX_VERTS = 60000;
+        const positions = wa.fp32_array(MAX_VERTS * 3);
+        const normals = wa.fp32_array(MAX_VERTS * 3);
+        const uvs = wa.fp32_array(MAX_VERTS * 2);
+        const colors = wa.fp32_array(MAX_VERTS * 4);
+        const counts = wa.u32_array(2);                   // rich_plant_generate: stem verts, leaf verts
+        const VARIANTS = 4;                               // seeds per plant: the copies of one species are not clones
+        const DYNAMIC_DRAW = 35048;                       // GL_DYNAMIC_DRAW
+        const library = {};                               // plant id -> { def, variants: [{ geo, total, inst, count }] }
+
+        function upload_plant(def, seed) {
+          const binder = def.generator === "rich" ? rich_binder : plant_binder;
+          binder.apply_preset(0);
+          Object.keys(def.props).forEach(function (k) { binder[k] = def.props[k]; });
+          binder.seed = seed;
+          const total = def.generator === "rich"
+            ? wa.rich_plant_generate(binder.ptr, positions.byteOffset, normals.byteOffset, uvs.byteOffset, colors.byteOffset, MAX_VERTS, counts.byteOffset, counts.byteOffset + 4)
+            : wa.plant_generate(binder.ptr, positions.byteOffset, normals.byteOffset, uvs.byteOffset, colors.byteOffset, MAX_VERTS);
+          // the colour alpha holds a per-part wind phase, not opacity: the material would read it as opacity
+          for (let i = 3; i < total * 4; i += 4) colors[i] = 1;
+
+          const geo = engine.create_geometry();
+          geo.positions = engine.geometry_set_attr({ item_size: 3 });
+          geo.normals = engine.geometry_set_attr({ item_size: 3 });
+          geo.uvs = engine.geometry_set_attr({ item_size: 2 });
+          geo.colors = engine.geometry_set_attr({ item_size: 4 });
+          geo.attr.a_position = geo.positions.uuid;
+          geo.attr.a_normal = geo.normals.uuid;
+          geo.attr.a_uv = geo.uvs.uuid;
+          geo.attr.a_color = geo.colors.uuid;
+          engine.geometry_set_attr(geo.positions, positions, total * 3);
+          engine.geometry_set_attr(geo.normals, normals, total * 3);
+          engine.geometry_set_attr(geo.uvs, uvs, total * 2);
+          engine.geometry_set_attr(geo.colors, colors, total * 4);
+
+          const inst = engine.geometry_set_attr({ buffer_type: DYNAMIC_DRAW, item_size: 3, divisor: 1 });
+          geo.attr.a_instance_a_position = inst.uuid;
+          engine.geometry_set_attr(inst, new Float32Array(3), 3);
+          return { geo: geo, total: total, inst: inst, count: 0 };
+        }
+
+        const plant_mat = engine.materials.create({
+          compiler: "pbr",
+          props: { enable_vertex_color: true },
+          state: { cullFace: null },                      // blades and petals are single ribbons: draw both faces
+          uniforms: { u_roughness: 0.8 },
+        });
+        const ground_geo = engine.geometries.plane(40, 40, 1, 1, 2);   // last argument: 1 = XY (a wall), 2 = XZ (the ground)
+        const ground_mat = engine.materials.create({
+          compiler: "pbr",
+          state: { cullFace: null },
+          uniforms: { u_base_color: engine.math.vec4(0.09, 0.075, 0.035, 1), u_roughness: 1 },
+        });
+
+        let habitat = null, density_scale = 1, scatter_seed = 1, stats = { instances: 0, vertices: 0 };
+        const stats_div = dom.$.div({ $style: "color:white;padding:4px;font-size:90%" });
+
+        function mulberry(a) {
+          return function () {
+            a = (a + 0x6D2B79F5) >>> 0;
+            let t = a;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function place(variant_lists) {                   // upload the instance positions of every variant
+          stats.instances = 0; stats.vertices = 0;
+          Object.keys(library).forEach(function (id) {
+            library[id].variants.forEach(function (v, i) {
+              const list = (variant_lists[id] && variant_lists[id][i]) || [];
+              v.count = list.length / 3;
+              if (v.count > 0) engine.geometry_set_attr(v.inst, new Float32Array(list), list.length);
+              stats.instances += v.count;
+              stats.vertices += v.count * v.total;
+            });
+          });
+          stats_div.textContent = stats.instances + " plants, " + (stats.vertices / 1e6).toFixed(2) + " M vertices drawn";
+        }
+
+        function build_habitat(h) {
+          habitat = h;
+          scene.camera.control.distance = Math.max(2.5, h.size_m * 0.8);   // pull back to fit the habitat
+          engine.tra_model.set_position(scene.camera.control, 0, 0.25, 0);
+          const rand = mulberry(7919 * scatter_seed);
+          const lists = {};
+          if (h.id === "showcase") {                      // one of each, in a row
+            const ids = Object.keys(library);
+            ids.forEach(function (id, i) { lists[id] = [[(i - (ids.length - 1) / 2) * 1.1, 0, 0], [], [], []]; });
+          }
+          else {
+            h.plants.forEach(function (e) {
+              if (!library[e.plant]) return;
+              const n = Math.min(40000, Math.round(e.density_per_m2 * density_scale * h.size_m * h.size_m));
+              const per = []; for (let i = 0; i < VARIANTS; i++) per.push([]);
+              for (let i = 0; i < n; i++) per[Math.floor(rand() * VARIANTS)].push((rand() - 0.5) * h.size_m, 0, (rand() - 0.5) * h.size_m);
+              lists[e.plant] = per;
+            });
+          }
+          place(lists);
+        }
+
+        httprequest.get_url("plant_presets.json", "json").then(function (doc) {
+          if (!doc || !doc.plants) return;
+          doc.plants.forEach(function (def) {
+            library[def.id] = { def: def, variants: [] };
+            for (let i = 0; i < VARIANTS; i++) library[def.id].variants.push(upload_plant(def, def.props.seed + i));
+          });
+          const habitats = doc.habitats.concat([{ id: "showcase", name: "Showcase (one of each)", size_m: 14, plants: [] }]);
+          const habitat_select = dom.$.select({
+            $style: "width:100%; margin-bottom: 6px;",
+            onchange: function () { build_habitat(habitats[this.value]); },
+          }, ...habitats.map(function (h, i) { return dom.$.option({ value: i }, h.name); }));
+          const density_slider = dom.$.input({
+            type: "range", min: 0.1, max: 2, step: 0.05, value: 1, $style: "width:100%",
+            oninput: function () { density_scale = parseFloat(this.value); build_habitat(habitat); },
+          });
+          const reseed = dom.$.button({ onclick: function () { scatter_seed++; build_habitat(habitat); } }, "scatter again");
+          dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px;color:white" }, habitat_select, "density ", density_slider, reseed, stats_div), dom.sidebar$.firstChild);
+          const want = (new URLSearchParams(location.search)).get("habitat");
+          const found = Math.max(0, habitats.findIndex(function (h) { return h.id === want; }));
+          habitat_select.value = found;
+          build_habitat(habitats[found]);
+          console.log("plants", Object.keys(library).length, "species,", VARIANTS, "seeds each");
+        });
+
+        function render_scene() {
+          engine.render_item(ground_geo, ground_mat, 0, 0, 0);
+          Object.keys(library).forEach(function (id) {
+            library[id].variants.forEach(function (v) {
+              if (v.count > 0) engine.render_item(v.geo, plant_mat, 0, v.total, v.count);
+            });
+          });
+          engine.debug.render();
+        }
+
+        engine.tra_model.yaw_pitch(scene.camera.control, 0, 0.38);        // look down at the ground, not along it
+
+        const scr = engine.deffered_rendering({
+          camera: scene.camera,
+          dlight0: scene.dlight0,
+          ENABLE_ATMOSPHERE: !true,
+          ENABLE_SHADOWS: true,
+          ENABLE_LOGDEPTH: false,
+        });
+        scr.on_shadowmap = function (time, time_delta) { render_scene(); };
+        scr.on_frame = function (time, time_delta) { render_scene(); };
+      }
+
+
+      // ?scene=plants shows the plant / grass catalog, anything else the tree test
+      const scene_select = dom.$.select({
+        $style: "width:100%; margin-bottom: 6px;",
+        onchange: function () { location.search = "?scene=" + this.value; },
+      }, dom.$.option({ value: "trees" }, "Scene: trees"), dom.$.option({ value: "plants" }, "Scene: plants and grass"));
+      const scene_name = (new URLSearchParams(location.search)).get("scene") === "plants" ? "plants" : "trees";
+      scene_select.value = scene_name;
+      dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px" }, scene_select), dom.sidebar$.firstChild);
+
+      if (scene_name === "plants") plants_test();
+      else test1();
 
     }
 
