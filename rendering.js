@@ -689,7 +689,7 @@ engine._render_item = function (geo, mat, draw_offset, draw_count, draw_instance
     if (draw_instances > 0) {
       gl.drawArraysInstanced(draw_type, draw_offset, draw_count, draw_instances);
     } else {
-      gl.drawArrays(draw_type, draw_offset * 4, draw_count);
+      gl.drawArrays(draw_type, draw_offset, draw_count);
     }
 
 
@@ -1238,7 +1238,7 @@ engine.flush_rendering = function () {
           if (draw_instances > 0) {
             gl.drawArraysInstanced(draw_type, draw_offset, draw_count, draw_instances);
           } else {
-            gl.drawArrays(draw_type, draw_offset * 4, draw_count);
+            gl.drawArrays(draw_type, draw_offset, draw_count);
           }
 
 
@@ -1312,6 +1312,13 @@ discard;
 void fragment(){
 #ifdef HAS_DISCARD
     has_discard();
+#endif
+    // only the alpha matters here, but end_main() still alpha-tests gl_FragColor.a (u_alpha_test): left unwritten
+    // it discards every fragment of an alpha-cut material (foliage cards) and they would cast no shadow at all
+#ifdef U_BASE_COLOR_MAP
+    gl_FragColor = vec4(0.0, 0.0, 0.0, texture2D(u_base_color_map, mat.uv).a);
+#else
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 #endif
 }`
       });

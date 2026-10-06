@@ -1,4 +1,6 @@
 packing("engine.js","debug.js")(function (engine, dom, httprequest) {
+  import("leaf_textures.js")
+
   function ready(engine) {
 
     const math = engine.math;
@@ -485,9 +487,9 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         const tree = make_tree_props(wa);
 
         console.log(tree);
-        let max_verts = 0;
-
-        max_verts = Math.ceil(max_verts * 4.0 + 10000); // large headroom for JSON presets and live tweaks
+        // Room for the woody mesh plus every twig card of a catalog tree (the largest, e.g. birch/maple, are
+        // ~11k verts; levels 7 / treeSteps 10 would need far more), so tree_generate never has to truncate.
+        const max_verts = 120000;
 
         const positions = wa.fp32_array(max_verts * 3);
         const normals = wa.fp32_array(max_verts * 3);
@@ -528,6 +530,15 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           engine.geometry_set_attr(gg.colors, colors, total * 4);
           gg.trunk_count = trunk_count_buf[0];
           gg.twig_count = total - gg.trunk_count;
+
+          let top = 0;
+          for (let i = 1; i < total * 3; i += 3) if (positions[i] > top) top = positions[i];
+          tree.height = top;
+          if (tree.frame_pending) {       // a species was just loaded: fit the camera to the new tree
+            tree.frame_pending = false;
+            engine.tra_model.set_position(scene.camera.control, 0, top * 0.45, 0);
+            scene.camera.control.distance = Math.max(10, top * 1.5);
+          }
         }
 
 
@@ -545,6 +556,56 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         });
 
 
+        // ---- twigs: tree_generate writes one double-sided card per terminal branch after the woody
+        // vertices (gg.trunk_count .. +gg.twig_count). Their UVs are meant for an alpha leaf texture and
+        // their vertex colour is the bark colour, so they get their own material: the procedural leaf
+        // texture (leaf_textures.js) as base colour, alpha-cut, no vertex colour.
+        const leaf_textures_cache = {};
+        function leaf_texture(id) {
+          if (!leaf_textures_cache[id]) {
+            const px = leaf_textures.pixels(id, 256);
+            // the canvas has v = 1 at the top row, GL uploads row 0 at v = 0: flip the rows
+            const flipped = new Uint8Array(px.data.length), stride = px.width * 4;
+            for (let y = 0; y < px.height; y++) flipped.set(px.data.subarray(y * stride, (y + 1) * stride), (px.height - 1 - y) * stride);
+            leaf_textures_cache[id] = engine.textures.create({ width: px.width, height: px.height, source: flipped, clamp: true });
+          }
+          return leaf_textures_cache[id];
+        }
+        const leaf_mat = engine.materials.create({
+          compiler: "pbr",
+          uniforms: {
+            u_base_color_map: leaf_texture("english_oak"),
+            u_alpha_test: 0.5,
+            u_roughness: 0.85,
+          }
+        });
+        tree.show_twigs = true;
+
+        // ---- species catalog (tree_trunk_presets.json): pick one to load its props, leaf texture and seed
+        function apply_species(sp) {
+          tree.apply_preset(0);
+          Object.keys(sp.props).forEach(function (k) { tree[k] = sp.props[k]; });
+          leaf_mat.uniforms.u_base_color_map = leaf_texture(sp.leaf_texture);
+          tree.ui_updaters.forEach(function (fn) { fn(); });
+          tree.needs_update = true;
+          tree.frame_pending = true;
+          console.log("species", sp.id, sp.name);
+        }
+        httprequest.get_url("tree_trunk_presets.json", "json").then(function (doc) {
+          if (!doc || !doc.trees) return;
+          const species_select = dom.$.select({
+            $style: "width:100%; margin-bottom: 6px;",
+            onchange: function () { if (this.value >= 0) apply_species(doc.trees[this.value]); },
+          }, dom.$.option({ value: -1 }, "-- Species (" + doc.trees.length + ") --"),
+            ...doc.trees.map(function (t, i) { return dom.$.option({ value: i }, t.name); }));
+          const twigs_toggle = dom.$.label({ $style: "display:block;color:white" },
+            dom.$.input({ type: "checkbox", checked: true, onchange: function () { tree.show_twigs = this.checked; } }), " twigs");
+          dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px" }, species_select, twigs_toggle), dom.sidebar$.firstChild);
+          const want = (new URLSearchParams(location.search)).get("species");
+          const found = want ? doc.trees.findIndex(function (t) { return t.id === want; }) : -1;
+          if (found >= 0) { species_select.value = found; apply_species(doc.trees[found]); }
+        });
+
         function render_scene() {
 
           if (tree.needs_update) {
@@ -552,6 +613,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
             update_tree();
           }
           engine.render_item(gg, mat, 0, gg.trunk_count, 0);
+          if (tree.show_twigs && gg.twig_count > 0) engine.render_item(gg, leaf_mat, gg.trunk_count, gg.twig_count, 0);
 
 
           engine.debug.render();
