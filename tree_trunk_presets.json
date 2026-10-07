@@ -3,7 +3,8 @@
   "notes": [
     "Each \"props\" object has all 43 tree_props fields, named and ordered exactly as the C++ struct in tree_system.cpp (and TREE_PROP_NAMES in tests.js), so it can be assigned straight onto the tree props object: for (k in props) tree[k] = props[k]; tree.needs_update = true.",
     "Units: 1 unit ~ 1 m. The coast redwood is scaled down, and all values stay inside the tests.js slider ranges. The stored seed is a typical-looking one; other seeds give natural variation (see generated.height_over_seeds_1_to_12) because lengthJitter, radiusJitter, azimuthJitter and elevationJitter are non-zero.",
-    "leaf_texture is the id to pass to leaf_textures.create()/pixels() (leaf_textures.js): twig cards are alpha-cut leaf textures and tree_generate colours them with the bark colour, so draw them with a material that does not use vertex colour. Requires the 43-prop tree_system.cpp (the last six fields are the jitter props, twigCards and twigNormalBlend). twigCards and twigNormalBlend give foliage volume (crossed cards, normals leaning out of the crown); set them to 1 and 0 for the old flat cards. All the *Jitter props can be set to 0 for the old, regular branching."
+    "leaf_texture is the id to pass to leaf_textures.create()/pixels() (leaf_textures.js): twig cards are alpha-cut leaf textures and tree_generate colours them with the bark colour, so draw them with a material that does not use vertex colour. Requires the 43-prop tree_system.cpp (the last six fields are the jitter props, twigCards and twigNormalBlend). twigCards and twigNormalBlend give foliage volume (crossed cards, normals leaning out of the crown); set them to 1 and 0 for the old flat cards. All the *Jitter props can be set to 0 for the old, regular branching.",
+    "bark: { style, scale, seed } picks a procedural bark texture + normal map (bark_textures.js, style names in bark_textures.STYLES). scale = how many texture tiles repeat across half the trunk circumference; the bark colour comes from the barkColor props (vertex colour), which multiplies the texture. The trunk UVs run u round the trunk (mirrored) and v along it in units of (radius / maxRadius) / vMultiplier, so a material scales uv by (scale, scale / (pi * maxRadius * vMultiplier)) to keep the texels square; see make_bark_material in tests.js."
   ],
   "prop_order": [
     "clumpMax",
@@ -61,6 +62,11 @@
         "dbh_m": "1.0-1.5"
       },
       "leaf_texture": "english_oak",
+      "bark": {
+        "style": "furrowed",
+        "scale": 1.2,
+        "seed": 1
+      },
       "generated": {
         "height": 22.7,
         "dbh": 1.15,
@@ -128,6 +134,11 @@
         "dbh_m": "0.4-0.7"
       },
       "leaf_texture": "scots_pine",
+      "bark": {
+        "style": "plates",
+        "scale": 1,
+        "seed": 1
+      },
       "generated": {
         "height": 25.1,
         "dbh": 0.53,
@@ -195,6 +206,11 @@
         "dbh_m": "0.2-0.3"
       },
       "leaf_texture": "silver_birch",
+      "bark": {
+        "style": "lenticels",
+        "scale": 0.8,
+        "seed": 1
+      },
       "generated": {
         "height": 14.9,
         "dbh": 0.23,
@@ -262,6 +278,11 @@
         "dbh_m": "0.3-0.5"
       },
       "leaf_texture": "italian_cypress",
+      "bark": {
+        "style": "fibrous",
+        "scale": 1.2,
+        "seed": 1
+      },
       "generated": {
         "height": 20.3,
         "dbh": 0.35,
@@ -329,6 +350,11 @@
         "dbh_m": "3-5"
       },
       "leaf_texture": "coast_redwood",
+      "bark": {
+        "style": "fluted",
+        "scale": 0.8,
+        "seed": 1
+      },
       "generated": {
         "height": 41.5,
         "dbh": 2.84,
@@ -396,6 +422,11 @@
         "dbh_m": "4-10"
       },
       "leaf_texture": "baobab",
+      "bark": {
+        "style": "smooth",
+        "scale": 0.8,
+        "seed": 2
+      },
       "generated": {
         "height": 16.6,
         "dbh": 4.2,
@@ -463,6 +494,11 @@
         "dbh_m": "0.8-1.2"
       },
       "leaf_texture": "weeping_willow",
+      "bark": {
+        "style": "deep_furrowed",
+        "scale": 1,
+        "seed": 2
+      },
       "generated": {
         "height": 14.3,
         "dbh": 1.1,
@@ -530,6 +566,11 @@
         "dbh_m": "0.3-0.8"
       },
       "leaf_texture": "olive",
+      "bark": {
+        "style": "twisted",
+        "scale": 0.8,
+        "seed": 1
+      },
       "generated": {
         "height": 6.9,
         "dbh": 0.48,
@@ -597,6 +638,11 @@
         "dbh_m": "0.5-0.9"
       },
       "leaf_texture": "sugar_maple",
+      "bark": {
+        "style": "furrowed",
+        "scale": 1.2,
+        "seed": 2
+      },
       "generated": {
         "height": 22.4,
         "dbh": 0.66,
@@ -664,6 +710,11 @@
         "dbh_m": "0.2-0.4"
       },
       "leaf_texture": "quaking_aspen",
+      "bark": {
+        "style": "lenticels",
+        "scale": 0.8,
+        "seed": 2
+      },
       "generated": {
         "height": 19.9,
         "dbh": 0.3,
@@ -731,6 +782,11 @@
         "dbh_m": "0.8-1.2"
       },
       "leaf_texture": "common_beech",
+      "bark": {
+        "style": "smooth",
+        "scale": 0.8,
+        "seed": 1
+      },
       "generated": {
         "height": 25.8,
         "dbh": 1,
@@ -798,6 +854,11 @@
         "dbh_m": "0.6-1.0"
       },
       "leaf_texture": "norway_spruce",
+      "bark": {
+        "style": "flakes",
+        "scale": 1.2,
+        "seed": 1
+      },
       "generated": {
         "height": 29.5,
         "dbh": 0.74,
@@ -865,6 +926,11 @@
         "dbh_m": "0.6-1.0"
       },
       "leaf_texture": "lombardy_poplar",
+      "bark": {
+        "style": "deep_furrowed",
+        "scale": 1.2,
+        "seed": 3
+      },
       "generated": {
         "height": 29.1,
         "dbh": 0.74,
@@ -932,6 +998,11 @@
         "dbh_m": "0.3-0.6"
       },
       "leaf_texture": "umbrella_acacia",
+      "bark": {
+        "style": "furrowed",
+        "scale": 1.2,
+        "seed": 4
+      },
       "generated": {
         "height": 10.5,
         "dbh": 0.45,
@@ -999,6 +1070,11 @@
         "dbh_m": "0.3-0.4"
       },
       "leaf_texture": "coconut_palm",
+      "bark": {
+        "style": "rings",
+        "scale": 0.8,
+        "seed": 1
+      },
       "generated": {
         "height": 14.3,
         "dbh": 0.33,
@@ -1066,6 +1142,11 @@
         "dbh_m": "0.3-0.5"
       },
       "leaf_texture": "cherry_blossom",
+      "bark": {
+        "style": "lenticels",
+        "scale": 0.8,
+        "seed": 3
+      },
       "generated": {
         "height": 9.5,
         "dbh": 0.4,
@@ -1133,6 +1214,11 @@
         "dbh_m": "1.0-2.0"
       },
       "leaf_texture": "blue_gum_eucalyptus",
+      "bark": {
+        "style": "fibrous",
+        "scale": 1,
+        "seed": 2
+      },
       "generated": {
         "height": 36,
         "dbh": 1.1,
@@ -1200,6 +1286,11 @@
         "dbh_m": "1.5-2.5"
       },
       "leaf_texture": "cedar_of_lebanon",
+      "bark": {
+        "style": "deep_furrowed",
+        "scale": 1.2,
+        "seed": 5
+      },
       "generated": {
         "height": 21.8,
         "dbh": 1.58,
@@ -1267,6 +1358,11 @@
         "dbh_m": "0.6-1.0"
       },
       "leaf_texture": "ginkgo",
+      "bark": {
+        "style": "furrowed",
+        "scale": 1.2,
+        "seed": 6
+      },
       "generated": {
         "height": 23.4,
         "dbh": 0.72,
@@ -1334,6 +1430,11 @@
         "dbh_m": "1.0-1.5"
       },
       "leaf_texture": "london_plane",
+      "bark": {
+        "style": "patchy",
+        "scale": 0.8,
+        "seed": 1
+      },
       "generated": {
         "height": 25.8,
         "dbh": 1.19,
@@ -1401,6 +1502,11 @@
         "dbh_m": "0.15-0.3"
       },
       "leaf_texture": "japanese_maple",
+      "bark": {
+        "style": "smooth",
+        "scale": 0.8,
+        "seed": 3
+      },
       "generated": {
         "height": 5.9,
         "dbh": 0.2,
@@ -1468,6 +1574,11 @@
         "dbh_m": "0.6-1.0"
       },
       "leaf_texture": "stone_pine",
+      "bark": {
+        "style": "plates",
+        "scale": 1,
+        "seed": 2
+      },
       "generated": {
         "height": 17.6,
         "dbh": 0.78,
@@ -1535,6 +1646,11 @@
         "dbh_m": "1.2-2.0"
       },
       "leaf_texture": "southern_live_oak",
+      "bark": {
+        "style": "furrowed",
+        "scale": 1.4,
+        "seed": 7
+      },
       "generated": {
         "height": 15.1,
         "dbh": 1.39,
@@ -1602,6 +1718,11 @@
         "dbh_m": "0.6-1.0"
       },
       "leaf_texture": "european_larch",
+      "bark": {
+        "style": "deep_furrowed",
+        "scale": 1.2,
+        "seed": 4
+      },
       "generated": {
         "height": 28.9,
         "dbh": 0.63,
@@ -1655,6 +1776,1158 @@
         "radiusJitter": 0.12,
         "azimuthJitter": 0.7,
         "elevationJitter": 0.2,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "white_ash",
+      "name": "White ash",
+      "scientific_name": "Fraxinus americana",
+      "description": "Straight, clean bole with open ascending limbs; diamond-patterned ridged bark and compound leaves.",
+      "real_world": {
+        "height_m": "20-30",
+        "dbh_m": "0.6-1.0"
+      },
+      "leaf_texture": "white_ash",
+      "bark": {
+        "style": "diamond",
+        "scale": 1.2,
+        "seed": 1
+      },
+      "generated": {
+        "height": 24.4,
+        "dbh": 0.85,
+        "crown_width": 20.8,
+        "woody_vertices": 9168,
+        "twig_cards": 384,
+        "height_over_seeds_1_to_12": [
+          20,
+          34.2
+        ]
+      },
+      "props": {
+        "clumpMax": 0.7,
+        "clumpMin": 0.5,
+        "lengthFalloffFactor": 0.72,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.4,
+        "radiusFalloffRate": 0.72,
+        "climbRate": 1.95,
+        "trunkKink": 0.1,
+        "maxRadius": 0.26,
+        "taperRate": 0.93,
+        "twistRate": 9,
+        "sweepAmount": 0,
+        "initialBranchLength": 3.467,
+        "trunkLength": 6.5,
+        "dropAmount": 0,
+        "growAmount": 0.2,
+        "vMultiplier": 0.2,
+        "twigScale": 2.3,
+        "seed": 34,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.36,
+        "barkColorG": 0.33,
+        "barkColorB": 0.3,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 6,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.3,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 0.8,
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "black_walnut",
+      "name": "Black walnut",
+      "scientific_name": "Juglans nigra",
+      "description": "Tall straight trunk with very dark, deeply furrowed bark and a broad open crown of large compound leaves.",
+      "real_world": {
+        "height_m": "22-30",
+        "dbh_m": "0.7-1.2"
+      },
+      "leaf_texture": "black_walnut",
+      "bark": {
+        "style": "deep_furrowed",
+        "scale": 1.2,
+        "seed": 6
+      },
+      "generated": {
+        "height": 24.1,
+        "dbh": 0.97,
+        "crown_width": 28.4,
+        "woody_vertices": 8016,
+        "twig_cards": 336,
+        "height_over_seeds_1_to_12": [
+          17.5,
+          37.3
+        ]
+      },
+      "props": {
+        "clumpMax": 0.6,
+        "clumpMin": 0.4,
+        "lengthFalloffFactor": 0.8,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.3,
+        "radiusFalloffRate": 0.74,
+        "climbRate": 1.682,
+        "trunkKink": 0.15,
+        "maxRadius": 0.31,
+        "taperRate": 0.92,
+        "twistRate": 8,
+        "sweepAmount": 0,
+        "initialBranchLength": 4.155,
+        "trunkLength": 4.947,
+        "dropAmount": 0.1,
+        "growAmount": 0.1,
+        "vMultiplier": 0.2,
+        "twigScale": 2.8,
+        "seed": 11,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.22,
+        "barkColorG": 0.17,
+        "barkColorB": 0.14,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 5,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.35,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 0.9,
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "horse_chestnut",
+      "name": "Horse chestnut",
+      "scientific_name": "Aesculus hippocastanum",
+      "description": "Stout trunk and a dense domed crown whose lower limbs sweep down; large palmate leaves.",
+      "real_world": {
+        "height_m": "20-30",
+        "dbh_m": "0.8-1.4"
+      },
+      "leaf_texture": "horse_chestnut",
+      "bark": {
+        "style": "furrowed",
+        "scale": 1.2,
+        "seed": 8
+      },
+      "generated": {
+        "height": 23.4,
+        "dbh": 1.13,
+        "crown_width": 34.5,
+        "woody_vertices": 6864,
+        "twig_cards": 288,
+        "height_over_seeds_1_to_12": [
+          17.8,
+          33.7
+        ]
+      },
+      "props": {
+        "clumpMax": 0.5,
+        "clumpMin": 0.3,
+        "lengthFalloffFactor": 0.8,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.4,
+        "radiusFalloffRate": 0.76,
+        "climbRate": 1.712,
+        "trunkKink": 0.15,
+        "maxRadius": 0.356,
+        "taperRate": 0.91,
+        "twistRate": 7,
+        "sweepAmount": 0,
+        "initialBranchLength": 4.921,
+        "trunkLength": 3.744,
+        "dropAmount": 0.15,
+        "growAmount": 0,
+        "vMultiplier": 0.2,
+        "twigScale": 3,
+        "seed": 20,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.3,
+        "barkColorG": 0.24,
+        "barkColorB": 0.19,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 4,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.4,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 0.9,
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "sweet_chestnut",
+      "name": "Sweet chestnut",
+      "scientific_name": "Castanea sativa",
+      "description": "Massive, often leaning trunk with bark ridges that spiral round it; heavy spreading limbs.",
+      "real_world": {
+        "height_m": "20-30",
+        "dbh_m": "1.0-2.0"
+      },
+      "leaf_texture": "sweet_chestnut",
+      "bark": {
+        "style": "twisted",
+        "scale": 1,
+        "seed": 2
+      },
+      "generated": {
+        "height": 24.4,
+        "dbh": 1.46,
+        "crown_width": 33.9,
+        "woody_vertices": 6864,
+        "twig_cards": 288,
+        "height_over_seeds_1_to_12": [
+          19,
+          32.4
+        ]
+      },
+      "props": {
+        "clumpMax": 0.5,
+        "clumpMin": 0.3,
+        "lengthFalloffFactor": 0.8,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.4,
+        "radiusFalloffRate": 0.78,
+        "climbRate": 1.662,
+        "trunkKink": 0.3,
+        "maxRadius": 0.465,
+        "taperRate": 0.9,
+        "twistRate": 9,
+        "sweepAmount": 0,
+        "initialBranchLength": 5,
+        "trunkLength": 3.324,
+        "dropAmount": 0.1,
+        "growAmount": 0,
+        "vMultiplier": 0.2,
+        "twigScale": 2.6,
+        "seed": 3,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.3,
+        "barkColorG": 0.25,
+        "barkColorB": 0.2,
+        "barkColorVariance": 0.04,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 4,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.45,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.18,
+        "azimuthJitter": 1,
+        "elevationJitter": 0.35,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "field_elm",
+      "name": "Field elm",
+      "scientific_name": "Ulmus minor",
+      "description": "Upright trunk dividing into a vase-shaped crown of arching limbs; deeply fissured bark.",
+      "real_world": {
+        "height_m": "20-30",
+        "dbh_m": "0.8-1.4"
+      },
+      "leaf_texture": "field_elm",
+      "bark": {
+        "style": "furrowed",
+        "scale": 1.2,
+        "seed": 9
+      },
+      "generated": {
+        "height": 26.1,
+        "dbh": 1.16,
+        "crown_width": 23.3,
+        "woody_vertices": 8016,
+        "twig_cards": 336,
+        "height_over_seeds_1_to_12": [
+          21.4,
+          35.5
+        ]
+      },
+      "props": {
+        "clumpMax": 0.7,
+        "clumpMin": 0.5,
+        "lengthFalloffFactor": 0.72,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.4,
+        "radiusFalloffRate": 0.72,
+        "climbRate": 2.306,
+        "trunkKink": 0.1,
+        "maxRadius": 0.326,
+        "taperRate": 0.92,
+        "twistRate": 8,
+        "sweepAmount": 0,
+        "initialBranchLength": 4.356,
+        "trunkLength": 6.406,
+        "dropAmount": -0.1,
+        "growAmount": 0.5,
+        "vMultiplier": 0.2,
+        "twigScale": 2.3,
+        "seed": 30,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.28,
+        "barkColorG": 0.23,
+        "barkColorB": 0.19,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 5,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.4,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 0.9,
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "small_leaved_lime",
+      "name": "Small-leaved lime",
+      "scientific_name": "Tilia cordata",
+      "description": "Straight trunk and a dense, rounded crown of small heart-shaped leaves.",
+      "real_world": {
+        "height_m": "20-30",
+        "dbh_m": "0.6-1.2"
+      },
+      "leaf_texture": "small_leaved_lime",
+      "bark": {
+        "style": "furrowed",
+        "scale": 1.2,
+        "seed": 10
+      },
+      "generated": {
+        "height": 23.3,
+        "dbh": 0.9,
+        "crown_width": 22.7,
+        "woody_vertices": 8016,
+        "twig_cards": 336,
+        "height_over_seeds_1_to_12": [
+          17.8,
+          34.8
+        ]
+      },
+      "props": {
+        "clumpMax": 0.65,
+        "clumpMin": 0.45,
+        "lengthFalloffFactor": 0.75,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.4,
+        "radiusFalloffRate": 0.74,
+        "climbRate": 1.949,
+        "trunkKink": 0.1,
+        "maxRadius": 0.285,
+        "taperRate": 0.92,
+        "twistRate": 8,
+        "sweepAmount": 0,
+        "initialBranchLength": 3.898,
+        "trunkLength": 4.586,
+        "dropAmount": 0.1,
+        "growAmount": 0.15,
+        "vMultiplier": 0.2,
+        "twigScale": 2.3,
+        "seed": 31,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.33,
+        "barkColorG": 0.29,
+        "barkColorB": 0.25,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 5,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.35,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 0.8,
+        "elevationJitter": 0.25,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "douglas_fir",
+      "name": "Douglas fir",
+      "scientific_name": "Pseudotsuga menziesii",
+      "description": "Very tall conical conifer with a corky, deeply furrowed trunk and irregular, slightly drooping limbs. Scaled down: real trees reach 50-80 m.",
+      "real_world": {
+        "height_m": "50-80 (scaled)",
+        "dbh_m": "1.0-2.5"
+      },
+      "leaf_texture": "douglas_fir",
+      "bark": {
+        "style": "deep_furrowed",
+        "scale": 1.2,
+        "seed": 7
+      },
+      "generated": {
+        "height": 34.7,
+        "dbh": 1.01,
+        "crown_width": 14.5,
+        "woody_vertices": 6864,
+        "twig_cards": 288,
+        "height_over_seeds_1_to_12": [
+          33.1,
+          38.4
+        ]
+      },
+      "props": {
+        "clumpMax": 0.55,
+        "clumpMin": 0.35,
+        "lengthFalloffFactor": 0.62,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.55,
+        "climbRate": 2.989,
+        "trunkKink": 0.04,
+        "maxRadius": 0.293,
+        "taperRate": 0.9,
+        "twistRate": 11,
+        "sweepAmount": 0,
+        "initialBranchLength": 3.448,
+        "trunkLength": 2.299,
+        "dropAmount": -0.05,
+        "growAmount": 0.1,
+        "vMultiplier": 0.2,
+        "twigScale": 3.2,
+        "seed": 33,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.32,
+        "barkColorG": 0.22,
+        "barkColorB": 0.17,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 10,
+        "segments": 8,
+        "levels": 3,
+        "rootFlare": 0.3,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.2,
+        "radiusJitter": 0.12,
+        "azimuthJitter": 0.7,
+        "elevationJitter": 0.2,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "western_red_cedar",
+      "name": "Western red cedar",
+      "scientific_name": "Thuja plicata",
+      "description": "Buttressed, fibrous-barked trunk with drooping, upturned-tipped sprays in a narrow cone. Scaled down: real trees reach 40-60 m.",
+      "real_world": {
+        "height_m": "40-60 (scaled)",
+        "dbh_m": "1.0-3.0"
+      },
+      "leaf_texture": "western_red_cedar",
+      "bark": {
+        "style": "fibrous",
+        "scale": 1.2,
+        "seed": 2
+      },
+      "generated": {
+        "height": 29.2,
+        "dbh": 1.24,
+        "crown_width": 11.3,
+        "woody_vertices": 6288,
+        "twig_cards": 264,
+        "height_over_seeds_1_to_12": [
+          27.3,
+          31.9
+        ]
+      },
+      "props": {
+        "clumpMax": 0.55,
+        "clumpMin": 0.35,
+        "lengthFalloffFactor": 0.62,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.55,
+        "climbRate": 2.679,
+        "trunkKink": 0.04,
+        "maxRadius": 0.316,
+        "taperRate": 0.88,
+        "twistRate": 10,
+        "sweepAmount": 0,
+        "initialBranchLength": 3.572,
+        "trunkLength": 2.233,
+        "dropAmount": 0.3,
+        "growAmount": 0.35,
+        "vMultiplier": 0.2,
+        "twigScale": 3.2,
+        "seed": 4,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.42,
+        "barkColorG": 0.3,
+        "barkColorB": 0.24,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 9,
+        "segments": 8,
+        "levels": 3,
+        "rootFlare": 0.55,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.2,
+        "radiusJitter": 0.12,
+        "azimuthJitter": 0.7,
+        "elevationJitter": 0.2,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "giant_sequoia",
+      "name": "Giant sequoia",
+      "scientific_name": "Sequoiadendron giganteum",
+      "description": "Colossal, fluted, fibrous red trunk with a swollen buttressed base and short, high limbs. Scaled down: real trees reach 70-95 m.",
+      "real_world": {
+        "height_m": "70-95 (scaled)",
+        "dbh_m": "4-8"
+      },
+      "leaf_texture": "giant_sequoia",
+      "bark": {
+        "style": "fluted",
+        "scale": 0.8,
+        "seed": 2
+      },
+      "generated": {
+        "height": 39.3,
+        "dbh": 2.46,
+        "crown_width": 10.3,
+        "woody_vertices": 6288,
+        "twig_cards": 264,
+        "height_over_seeds_1_to_12": [
+          37,
+          42.3
+        ]
+      },
+      "props": {
+        "clumpMax": 0.6,
+        "clumpMin": 0.4,
+        "lengthFalloffFactor": 0.58,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.6,
+        "climbRate": 2.912,
+        "trunkKink": 0.03,
+        "maxRadius": 0.517,
+        "taperRate": 0.93,
+        "twistRate": 9,
+        "sweepAmount": 0,
+        "initialBranchLength": 2.669,
+        "trunkLength": 9.706,
+        "dropAmount": 0,
+        "growAmount": 0.2,
+        "vMultiplier": 0.2,
+        "twigScale": 3,
+        "seed": 1,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.43,
+        "barkColorG": 0.24,
+        "barkColorB": 0.17,
+        "barkColorVariance": 0.04,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 9,
+        "segments": 8,
+        "levels": 3,
+        "rootFlare": 0.55,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.2,
+        "radiusJitter": 0.1,
+        "azimuthJitter": 0.7,
+        "elevationJitter": 0.15,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "ponderosa_pine",
+      "name": "Ponderosa pine",
+      "scientific_name": "Pinus ponderosa",
+      "description": "Tall, long-boled pine with orange, jigsaw-plated bark and long needles in tufts. Scaled down: real trees reach 40-70 m.",
+      "real_world": {
+        "height_m": "40-70 (scaled)",
+        "dbh_m": "0.7-1.2"
+      },
+      "leaf_texture": "ponderosa_pine",
+      "bark": {
+        "style": "plates",
+        "scale": 1,
+        "seed": 3
+      },
+      "generated": {
+        "height": 31.1,
+        "dbh": 0.96,
+        "crown_width": 11,
+        "woody_vertices": 5712,
+        "twig_cards": 240,
+        "height_over_seeds_1_to_12": [
+          28.6,
+          34.8
+        ]
+      },
+      "props": {
+        "clumpMax": 0.6,
+        "clumpMin": 0.4,
+        "lengthFalloffFactor": 0.6,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.6,
+        "climbRate": 2.364,
+        "trunkKink": 0.05,
+        "maxRadius": 0.24,
+        "taperRate": 0.93,
+        "twistRate": 10,
+        "sweepAmount": 0,
+        "initialBranchLength": 2.794,
+        "trunkLength": 8.597,
+        "dropAmount": 0.05,
+        "growAmount": 0.2,
+        "vMultiplier": 0.2,
+        "twigScale": 3.6,
+        "seed": 1,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.5,
+        "barkColorG": 0.31,
+        "barkColorB": 0.2,
+        "barkColorVariance": 0.04,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 8,
+        "segments": 8,
+        "levels": 3,
+        "rootFlare": 0.3,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.2,
+        "radiusJitter": 0.1,
+        "azimuthJitter": 0.7,
+        "elevationJitter": 0.2,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "black_locust",
+      "name": "Black locust",
+      "scientific_name": "Robinia pseudoacacia",
+      "description": "Crooked, irregularly branched tree with very deep, twisting ridges and light compound leaves.",
+      "real_world": {
+        "height_m": "15-25",
+        "dbh_m": "0.5-0.9"
+      },
+      "leaf_texture": "black_locust",
+      "bark": {
+        "style": "twisted",
+        "scale": 1,
+        "seed": 3
+      },
+      "generated": {
+        "height": 22.8,
+        "dbh": 0.78,
+        "crown_width": 22,
+        "woody_vertices": 8016,
+        "twig_cards": 336,
+        "height_over_seeds_1_to_12": [
+          17.5,
+          33.5
+        ]
+      },
+      "props": {
+        "clumpMax": 0.6,
+        "clumpMin": 0.4,
+        "lengthFalloffFactor": 0.72,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.4,
+        "radiusFalloffRate": 0.7,
+        "climbRate": 2.015,
+        "trunkKink": 0.35,
+        "maxRadius": 0.245,
+        "taperRate": 0.92,
+        "twistRate": 10,
+        "sweepAmount": 0,
+        "initialBranchLength": 3.526,
+        "trunkLength": 5.038,
+        "dropAmount": 0,
+        "growAmount": 0.2,
+        "vMultiplier": 0.2,
+        "twigScale": 2.4,
+        "seed": 31,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.24,
+        "barkColorG": 0.19,
+        "barkColorB": 0.16,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 5,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.25,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.35,
+        "radiusJitter": 0.2,
+        "azimuthJitter": 1,
+        "elevationJitter": 0.35,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "cork_oak",
+      "name": "Cork oak",
+      "scientific_name": "Quercus suber",
+      "description": "Short, thick, gnarled trunk wrapped in thick, knobbly cork; wide evergreen crown.",
+      "real_world": {
+        "height_m": "10-20",
+        "dbh_m": "0.8-1.4"
+      },
+      "leaf_texture": "cork_oak",
+      "bark": {
+        "style": "corky",
+        "scale": 1,
+        "seed": 1
+      },
+      "generated": {
+        "height": 12.5,
+        "dbh": 1.05,
+        "crown_width": 22,
+        "woody_vertices": 5712,
+        "twig_cards": 240,
+        "height_over_seeds_1_to_12": [
+          10,
+          20.1
+        ]
+      },
+      "props": {
+        "clumpMax": 0.45,
+        "clumpMin": 0.25,
+        "lengthFalloffFactor": 0.85,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.78,
+        "climbRate": 0.79,
+        "trunkKink": 0.35,
+        "maxRadius": 0.358,
+        "taperRate": 0.9,
+        "twistRate": 7,
+        "sweepAmount": 0,
+        "initialBranchLength": 3.029,
+        "trunkLength": 1.449,
+        "dropAmount": 0,
+        "growAmount": 0,
+        "vMultiplier": 0.2,
+        "twigScale": 2.2,
+        "seed": 25,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.38,
+        "barkColorG": 0.25,
+        "barkColorB": 0.18,
+        "barkColorVariance": 0.04,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 3,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.4,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 1,
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "jacaranda",
+      "name": "Jacaranda",
+      "scientific_name": "Jacaranda mimosifolia",
+      "description": "Spreading, vase-shaped crown that carries a haze of lilac-blue trumpet flowers.",
+      "real_world": {
+        "height_m": "10-15",
+        "dbh_m": "0.4-0.6"
+      },
+      "leaf_texture": "jacaranda",
+      "bark": {
+        "style": "smooth",
+        "scale": 0.8,
+        "seed": 4
+      },
+      "generated": {
+        "height": 12.6,
+        "dbh": 0.47,
+        "crown_width": 19,
+        "woody_vertices": 5712,
+        "twig_cards": 240,
+        "height_over_seeds_1_to_12": [
+          10.1,
+          17.8
+        ]
+      },
+      "props": {
+        "clumpMax": 0.5,
+        "clumpMin": 0.3,
+        "lengthFalloffFactor": 0.8,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.72,
+        "climbRate": 0.981,
+        "trunkKink": 0.3,
+        "maxRadius": 0.17,
+        "taperRate": 0.9,
+        "twistRate": 7,
+        "sweepAmount": 0,
+        "initialBranchLength": 2.661,
+        "trunkLength": 2.101,
+        "dropAmount": 0,
+        "growAmount": 0.2,
+        "vMultiplier": 0.2,
+        "twigScale": 2.4,
+        "seed": 31,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.4,
+        "barkColorG": 0.34,
+        "barkColorB": 0.3,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 3,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.3,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.15,
+        "azimuthJitter": 1,
+        "elevationJitter": 0.3,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "date_palm",
+      "name": "Date palm",
+      "scientific_name": "Phoenix dactylifera",
+      "description": "Thick, straight trunk patterned with old leaf bases, topped by a crown of stiff grey-green fronds. An approximation like the coconut palm.",
+      "real_world": {
+        "height_m": "15-25 (scaled)",
+        "dbh_m": "0.4-0.6"
+      },
+      "leaf_texture": "date_palm",
+      "bark": {
+        "style": "diamond",
+        "scale": 1.2,
+        "seed": 2
+      },
+      "generated": {
+        "height": 15.8,
+        "dbh": 0.54,
+        "crown_width": 8.2,
+        "woody_vertices": 1392,
+        "twig_cards": 60,
+        "height_over_seeds_1_to_12": [
+          13.8,
+          17.6
+        ]
+      },
+      "props": {
+        "clumpMax": 0.4,
+        "clumpMin": 0.2,
+        "lengthFalloffFactor": 0.8,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.75,
+        "climbRate": 0.526,
+        "trunkKink": 0.1,
+        "maxRadius": 0.167,
+        "taperRate": 0.98,
+        "twistRate": 7,
+        "sweepAmount": 0,
+        "initialBranchLength": 2.256,
+        "trunkLength": 8.273,
+        "dropAmount": 0,
+        "growAmount": -0.4,
+        "vMultiplier": 0.2,
+        "twigScale": 3.2,
+        "seed": 26,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.46,
+        "barkColorG": 0.37,
+        "barkColorB": 0.28,
+        "barkColorVariance": 0.02,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 8,
+        "segments": 8,
+        "levels": 1,
+        "rootFlare": 0.3,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.15,
+        "radiusJitter": 0.1,
+        "azimuthJitter": 1.2,
+        "elevationJitter": 0.2,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "bald_cypress",
+      "name": "Bald cypress",
+      "scientific_name": "Taxodium distichum",
+      "description": "Strongly flared, fibrous-barked trunk, conical crown of feathery, light-green deciduous sprays.",
+      "real_world": {
+        "height_m": "25-40 (scaled)",
+        "dbh_m": "0.9-1.5"
+      },
+      "leaf_texture": "bald_cypress",
+      "bark": {
+        "style": "fibrous",
+        "scale": 1.2,
+        "seed": 3
+      },
+      "generated": {
+        "height": 26,
+        "dbh": 1.03,
+        "crown_width": 10.3,
+        "woody_vertices": 5712,
+        "twig_cards": 240,
+        "height_over_seeds_1_to_12": [
+          23.5,
+          28.1
+        ]
+      },
+      "props": {
+        "clumpMax": 0.6,
+        "clumpMin": 0.4,
+        "lengthFalloffFactor": 0.6,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.58,
+        "climbRate": 2.305,
+        "trunkKink": 0.05,
+        "maxRadius": 0.223,
+        "taperRate": 0.9,
+        "twistRate": 9,
+        "sweepAmount": 0,
+        "initialBranchLength": 2.724,
+        "trunkLength": 4.191,
+        "dropAmount": 0.15,
+        "growAmount": 0.1,
+        "vMultiplier": 0.2,
+        "twigScale": 2.8,
+        "seed": 20,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.46,
+        "barkColorG": 0.34,
+        "barkColorB": 0.28,
+        "barkColorVariance": 0.03,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 8,
+        "segments": 8,
+        "levels": 3,
+        "rootFlare": 0.65,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.2,
+        "radiusJitter": 0.12,
+        "azimuthJitter": 0.8,
+        "elevationJitter": 0.2,
+        "twigCards": 3,
+        "twigNormalBlend": 0.75
+      }
+    },
+    {
+      "id": "snow_gum",
+      "name": "Snow gum",
+      "scientific_name": "Eucalyptus pauciflora",
+      "description": "Short, crooked multi-limbed gum with smooth cream-and-grey patchwork bark and drooping grey-green leaves.",
+      "real_world": {
+        "height_m": "8-15",
+        "dbh_m": "0.3-0.6"
+      },
+      "leaf_texture": "snow_gum",
+      "bark": {
+        "style": "patchy",
+        "scale": 0.8,
+        "seed": 2
+      },
+      "generated": {
+        "height": 11.7,
+        "dbh": 0.5,
+        "crown_width": 16.2,
+        "woody_vertices": 5712,
+        "twig_cards": 240,
+        "height_over_seeds_1_to_12": [
+          9.2,
+          16.2
+        ]
+      },
+      "props": {
+        "clumpMax": 0.5,
+        "clumpMin": 0.3,
+        "lengthFalloffFactor": 0.8,
+        "lengthFalloffPower": 1,
+        "branchFactor": 2.5,
+        "radiusFalloffRate": 0.75,
+        "climbRate": 0.975,
+        "trunkKink": 0.4,
+        "maxRadius": 0.186,
+        "taperRate": 0.9,
+        "twistRate": 9,
+        "sweepAmount": 0,
+        "initialBranchLength": 2.436,
+        "trunkLength": 1.624,
+        "dropAmount": 0.1,
+        "growAmount": 0.1,
+        "vMultiplier": 0.2,
+        "twigScale": 2.4,
+        "seed": 9,
+        "branchFactorTrunk": 3.5,
+        "clumpMaxTrunk": 0.8,
+        "clumpMinTrunk": 0.5,
+        "barkColorR": 0.76,
+        "barkColorG": 0.7,
+        "barkColorB": 0.6,
+        "barkColorVariance": 0.06,
+        "fruitChance": 0,
+        "fruitSize": 0.5,
+        "fruitColorR": 0.8,
+        "fruitColorG": 0.1,
+        "fruitColorB": 0.1,
+        "treeSteps": 3,
+        "segments": 8,
+        "levels": 4,
+        "rootFlare": 0.25,
+        "twigAngleJitter": 0,
+        "fruitClusterCount": 1,
+        "lengthJitter": 0.3,
+        "radiusJitter": 0.18,
+        "azimuthJitter": 1,
+        "elevationJitter": 0.35,
         "twigCards": 3,
         "twigNormalBlend": 0.75
       }

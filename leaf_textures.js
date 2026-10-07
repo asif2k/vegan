@@ -39,6 +39,23 @@ const leaf_textures = (function () {
     stone_pine:         { kind: 'needle',  color: [52, 104, 58],  count: 16, size: 0.23, spread: 0.30, hang: 0.25, twig: [120, 72, 50] },
     southern_live_oak:  { kind: 'ovate',   color: [46, 92, 48],   count: 80, size: 0.085, spread: 0.42, hang: 0.20, twig: [60, 48, 40] },
     european_larch:     { kind: 'needle',  color: [126, 166, 72], count: 32, size: 0.14, spread: 0.36, hang: 0.45, twig: [110, 78, 56] },
+    // ---- second expansion. pairs / lw: leaflet pairs and width of a compound (pinnate) leaf, lw also the width of 'serrate' leaves
+    white_ash:          { kind: 'pinnate', color: [92, 142, 56],  count: 14, size: 0.19, spread: 0.32, hang: 0.20, twig: [96, 90, 78], pairs: 4, lw: 0.2 },
+    black_walnut:       { kind: 'pinnate', color: [96, 140, 54],  count: 10, size: 0.22, spread: 0.32, hang: 0.25, twig: [84, 70, 58], pairs: 6, lw: 0.2 },
+    horse_chestnut:     { kind: 'palmate', color: [72, 128, 48],  count: 8,  size: 0.27, spread: 0.32, hang: 0.45, twig: [100, 80, 62] },
+    sweet_chestnut:     { kind: 'serrate', color: [82, 130, 50],  count: 26, size: 0.20, spread: 0.38, hang: 0.30, twig: [96, 76, 58], lw: 0.17 },
+    field_elm:          { kind: 'serrate', color: [80, 124, 50],  count: 54, size: 0.12, spread: 0.40, hang: 0.30, twig: [90, 74, 60], lw: 0.32 },
+    small_leaved_lime:  { kind: 'heart',   color: [96, 144, 62],  count: 52, size: 0.12, spread: 0.40, hang: 0.30, twig: [100, 84, 70] },
+    douglas_fir:        { kind: 'needle',  color: [50, 96, 62],   count: 42, size: 0.14, spread: 0.36, hang: 0.50, twig: [86, 62, 46] },
+    western_red_cedar:  { kind: 'feather', color: [44, 92, 54],   count: 16, size: 0.20, spread: 0.34, hang: 0.60, twig: [96, 62, 46] },
+    giant_sequoia:      { kind: 'scale',   color: [58, 108, 88],  count: 150, size: 0.055, spread: 0.32, hang: 0.30, twig: [120, 70, 48] },
+    ponderosa_pine:     { kind: 'needle',  color: [64, 112, 56],  count: 14, size: 0.27, spread: 0.30, hang: 0.30, twig: [124, 78, 52] },
+    black_locust:       { kind: 'pinnate', color: [104, 150, 66], count: 16, size: 0.19, spread: 0.34, hang: 0.30, twig: [86, 70, 56], pairs: 7, lw: 0.34 },
+    cork_oak:           { kind: 'ovate',   color: [52, 96, 54],   count: 70, size: 0.09, spread: 0.40, hang: 0.20, twig: [90, 62, 46] },
+    jacaranda:          { kind: 'blossom', color: [150, 112, 206], count: 70, size: 0.075, spread: 0.40, hang: 0.25, twig: [92, 72, 62] },
+    date_palm:          { kind: 'frond',   color: [96, 128, 84],  count: 5,  size: 0.40, spread: 0.14, hang: 0.45, twig: [122, 100, 74] },
+    bald_cypress:       { kind: 'feather', color: [118, 160, 80], count: 20, size: 0.20, spread: 0.34, hang: 0.45, twig: [110, 78, 60] },
+    snow_gum:           { kind: 'narrow',  color: [104, 140, 112], count: 55, size: 0.26, spread: 0.34, hang: 0.65, twig: [170, 160, 140] },
   };
 
   function rng(seed) {   // small deterministic generator (mulberry32)
@@ -86,6 +103,37 @@ const leaf_textures = (function () {
       g.moveTo(0, 0);
       for (let i = 0; i <= 14; i++) { const a = -0.95 + 1.9 * i / 14, notch = Math.abs(a) < 0.12 ? 0.82 : 1.0; g.lineTo(Math.cos(a) * notch, Math.sin(a) * notch); }
       g.closePath();
+    },
+    heart(g) {   // lime: heart-shaped, notched at the stalk, pointed tip
+      g.moveTo(1, 0);
+      g.bezierCurveTo(0.8, -0.25, 0.5, -0.55, 0.15, -0.45); g.bezierCurveTo(-0.05, -0.38, -0.02, -0.1, 0.08, 0);
+      g.bezierCurveTo(-0.02, 0.1, -0.05, 0.38, 0.15, 0.45); g.bezierCurveTo(0.5, 0.55, 0.8, 0.25, 1, 0);
+      g.closePath();
+    },
+    serrate(g, spec) {   // elm, chestnut: an oval with a toothed edge (spec.lw = half width)
+      const n = 22, W = (spec && spec.lw) || 0.3;
+      for (let side = 0; side < 2; side++) {
+        for (let i = 0; i <= n; i++) {
+          const t = side === 0 ? i / n : 1 - i / n;
+          const w = W * Math.pow(Math.sin(Math.PI * t), 0.85) * (0.86 + 0.14 * ((i % 2) ? 1 : -1));
+          const y = side === 0 ? -w : w;
+          if (side === 0 && i === 0) g.moveTo(t, y); else g.lineTo(t, y);
+        }
+      }
+      g.closePath();
+    },
+    pinnate(g, spec) {   // ash, walnut, locust: a stalk with pairs of leaflets and one at the tip (the midrib the caller strokes is the stalk)
+      const pairs = (spec && spec.pairs) || 5, lw = (spec && spec.lw) || 0.25;
+      const leaflet = function (x, y, a, L) {
+        const c = Math.cos(a), s = Math.sin(a), p = (u, v) => [x + u * c - v * s, y + u * s + v * c];
+        const m = p(0, 0), q1 = p(L * 0.5, -lw * L), e = p(L, 0), q2 = p(L * 0.5, lw * L);
+        g.moveTo(m[0], m[1]); g.quadraticCurveTo(q1[0], q1[1], e[0], e[1]); g.quadraticCurveTo(q2[0], q2[1], m[0], m[1]);
+      };
+      for (let i = 0; i < pairs; i++) {
+        const t = 0.1 + 0.62 * i / Math.max(1, pairs - 1), L = 0.34 * (1 - 0.35 * Math.abs(i / pairs - 0.4));
+        leaflet(t, 0, -0.95, L); leaflet(t, 0, 0.95, L);
+      }
+      leaflet(0.76, 0, 0, 0.26);
     },
     palmate(g) {   // baobab: leaflets fanning from one point
       for (let i = -2; i <= 2; i++) {
@@ -176,12 +224,12 @@ const leaf_textures = (function () {
         grad.addColorStop(0.5, shade(spec.color, p.k));
         grad.addColorStop(1, shade(spec.color, p.k * 0.78));
         g.fillStyle = grad;
-        g.beginPath(); SHAPES[spec.kind](g); g.fill();
+        g.beginPath(); SHAPES[spec.kind](g, spec); g.fill();
         g.lineWidth = 0.02; g.strokeStyle = shade(spec.color, p.k * 0.55);   // edge: a slightly darker rim separates overlapping leaves
         g.globalAlpha = 0.5; g.stroke(); g.globalAlpha = 1;
         g.lineWidth = 0.025; g.strokeStyle = shade(spec.color, p.k * 0.62);   // midrib
         g.beginPath(); g.moveTo(0, 0); g.lineTo(0.9, 0); g.stroke();
-        if (spec.kind === 'ovate' || spec.kind === 'round' || spec.kind === 'lobed') {   // side veins
+        if (spec.kind === 'ovate' || spec.kind === 'round' || spec.kind === 'lobed' || spec.kind === 'serrate' || spec.kind === 'heart') {   // side veins
           g.lineWidth = 0.012; g.globalAlpha = 0.55;
           for (let vi = 1; vi <= 3; vi++) { const t = vi * 0.2; for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(t, 0); g.lineTo(t + 0.17, sd * 0.2); g.stroke(); } }
           g.globalAlpha = 1;

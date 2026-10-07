@@ -1,5 +1,6 @@
 packing("engine.js","debug.js")(function (engine, dom, httprequest) {
   import("leaf_textures.js")
+  import("bark_textures.js")
   import("scatter_lod.js")
 
   function ready(engine) {
@@ -552,8 +553,8 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           tree.height = top;
           if (tree.frame_pending) {       // a species was just loaded: fit the camera to the new tree
             tree.frame_pending = false;
-            engine.tra_model.set_position(scene.camera.control, 0, top * 0.45, 0);
-            scene.camera.control.distance = Math.max(10, top * parseFloat(url_params.get("zoomf") || "1.5"));
+            engine.tra_model.set_position(scene.camera.control, 0, url_params.has("ty") ? parseFloat(url_params.get("ty")) : top * 0.45, 0);     // ?ty= looks at a given height (m), e.g. the trunk
+            scene.camera.control.distance = url_params.has("dist") ? parseFloat(url_params.get("dist")) : Math.max(10, top * parseFloat(url_params.get("zoomf") || "1.5"));
             if (url_params.has("yaw") || url_params.has("pitch")) engine.tra_model.yaw_pitch(scene.camera.control, parseFloat(url_params.get("yaw") || "0"), parseFloat(url_params.get("pitch") || "0"));   // ?yaw= / ?pitch= (radians) to look from another side
           }
         }
@@ -578,6 +579,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
         // their vertex colour is the bark colour, so they get their own material: the procedural leaf
         // texture (leaf_textures.js) as base colour, alpha-cut, no vertex colour.
         const leaf_mat = make_leaf_material("english_oak");   // shared foliage material (see LEAF_SHADER)
+        let trunk_mat = mat;                                   // the species' bark material once one is picked (see make_bark_material)
         tree.show_twigs = true;
 
         // ---- species catalog (tree_trunk_presets.json): pick one to load its props, leaf texture and seed
@@ -587,6 +589,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           if (url_params.has("cards")) tree.twigCards = parseFloat(url_params.get("cards"));        // ?cards= / ?blend= override the catalog values
           if (url_params.has("blend")) tree.twigNormalBlend = parseFloat(url_params.get("blend"));
           leaf_mat.uniforms.u_base_color_map = leaf_texture_for(sp.leaf_texture);
+          trunk_mat = make_bark_material(sp);
           tree.ui_updaters.forEach(function (fn) { fn(); });
           tree.needs_update = true;
           tree.frame_pending = true;
@@ -613,7 +616,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
             tree.needs_update = false;
             update_tree();
           }
-          engine.render_item(gg, mat, 0, gg.trunk_count, 0);
+          engine.render_item(gg, trunk_mat, 0, gg.trunk_count, 0);
           if (tree.show_twigs && gg.twig_count > 0) engine.render_item(gg, leaf_mat, gg.trunk_count, gg.twig_count, 0);
 
 
@@ -641,6 +644,7 @@ packing("engine.js","debug.js")(function (engine, dom, httprequest) {
           render_scene();
         };
         wind_controls();
+        bark_controls();
 
 
 
@@ -891,6 +895,65 @@ void vertex(){
         }
         return leaf_texture_cache[id];
       }
+      // ---- bark. The catalog gives every species a `bark` entry { style, scale, bump?, seed? }: style picks one of the procedural
+      // bark_textures.js images, scale how often it repeats round the trunk (roughness, gain, seed are optional). The bark colour stays in the vertex colour, which
+      // multiplies the texture's albedo (crevices dark, ridges light); the normal map (the "bump") reacts to the sun and is
+      // faded in the shader by u_bark_params.y (?bump=0 turns it off, the sidebar slider changes it live).
+      // trunk uv: u runs half way round (0 -> 1, then mirrored) and v along the branch in units of
+      // (radius / maxRadius) / vMultiplier, so one texture tile is pi * r wide and r / (maxRadius * vMultiplier) long: v needs
+      // maxRadius * vMultiplier * pi times u's scale to keep the texels square on every branch
+      const BARK_SHADER = `
+uniform vec2 u_bark_uv;
+void vertex(){
+	super_vertex();
+	v_uv *= u_bark_uv;
+}
+[fragment-shader]
+uniform vec4 u_bark_params;    // x: albedo gain (the texture's mean is below 1), y: bump strength
+void resolve_normal_map(inout Material mat){
+	vec3 n = texture2D(u_normal_map, mat.uv).rgb * 2.0 - 1.0;
+	n.xy *= u_bark_params.y;
+	process_normal_map(mat, normalize(n), mat.uv);
+}
+void resolve_shading_attributes(inout Material mat){
+	super_resolve_shading_attributes(mat);
+	mat.base_color.rgb *= u_bark_params.x;
+}`;
+      const bark_texture_cache = {}, bark_material_cache = {};
+      let bark_bump = url_params.has("bump") ? parseFloat(url_params.get("bump")) : 1;
+      function bark_textures_for(style, seed) {
+        const key = style + ":" + seed;
+        if (!bark_texture_cache[key]) {
+          const px = bark_textures.pixels(style, 256, seed);
+          bark_texture_cache[key] = {
+            albedo: engine.textures.create({ width: px.width, height: px.height, source: px.albedo, mipmap: true }),
+            normal: engine.textures.create({ width: px.width, height: px.height, source: px.normal, mipmap: true }),
+          };
+        }
+        return bark_texture_cache[key];
+      }
+      function make_bark_material(sp) {
+        if (bark_material_cache[sp.id]) return bark_material_cache[sp.id];
+        const bk = sp.bark || { style: "furrowed", scale: 3 }, tex = bark_textures_for(bk.style, bk.seed || 1);
+        const aspect = 1 / (Math.PI * sp.props.maxRadius * sp.props.vMultiplier), scale = url_params.has("bscale") ? parseFloat(url_params.get("bscale")) : (bk.scale || 3);   // ?bscale= overrides the catalog's tiling
+        return bark_material_cache[sp.id] = engine.materials.create({
+          compiler: "pbr",
+          props: { enable_vertex_color: true },
+          shader: BARK_SHADER,
+          uniforms: {
+            u_base_color_map: tex.albedo, u_normal_map: tex.normal, u_roughness: bk.roughness || 0.9,
+            u_bark_uv: engine.math.vec2(scale, scale * aspect),
+            u_bark_params: engine.math.vec4(bk.gain || 1.35, bark_bump, 0, 0),
+          },
+        });
+      }
+      function bark_controls() {
+        const slider = dom.$.input({ type: "range", min: 0, max: 2, step: 0.05, value: bark_bump, $style: "width:100%", oninput: function () {
+          bark_bump = parseFloat(this.value);
+          Object.keys(bark_material_cache).forEach(function (id) { bark_material_cache[id].uniforms.u_bark_params[1] = bark_bump; });
+        } });
+        dom.sidebar$.insertBefore(dom.$.div({ $style: "padding:4px;color:white" }, "bark bump ", slider), dom.sidebar$.firstChild);
+      }
       // text for the LOD statistics: instances drawn per level, per group
       function lod_stats_text(lod) {
         const st = lod.stats, groups = {};
@@ -1021,7 +1084,6 @@ void vertex(){
         lod.enabled = url_params.get("lod") !== "0";
         if (url_params.has("bias")) lod.bias = parseFloat(url_params.get("bias"));
         const plant_mat = make_plant_material();
-        const bark_mat = engine.materials.create({ compiler: "pbr", props: { enable_vertex_color: true }, uniforms: { u_roughness: 0.9 } });
         const ground = make_ground(WORLD * 1.6, [0.07, 0.085, 0.03]);
         const fly = make_fly(3);
         const stats_div = dom.$.div({ $style: "color:white;padding:4px;font-size:90%;white-space:pre" });
@@ -1070,7 +1132,7 @@ void vertex(){
           if (!tree_doc || !plant_doc) return;
           TREES.forEach(function (t) {
             const sp = tree_doc.trees.find(function (x) { return x.id === t[0]; });
-            if (sp) build_tree_kind(lod, tree_binder, sp, bark_mat, make_leaf_material(sp.leaf_texture), 3);
+            if (sp) build_tree_kind(lod, tree_binder, sp, make_bark_material(sp), make_leaf_material(sp.leaf_texture), 3);
           });
           plant_doc.plants.forEach(function (def) { if (UNDERGROWTH[def.id] !== undefined) build_plant_kind(lod, binders, def, plant_mat, 3); });
           populate();
@@ -1098,6 +1160,7 @@ void vertex(){
         antialias_controls(scr);
         scr.on_shadowmap = function (time, time_delta) { lod.render("shadow"); };
         wind_controls();
+        bark_controls();
         scr.on_frame = function (time, time_delta) {
           wind_tick();
           fly.step();
