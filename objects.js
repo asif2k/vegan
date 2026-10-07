@@ -432,7 +432,7 @@ engine.shaders = (function () {
 			shdr.all_attributes = [];
 			for (i = 0; i < gl.getProgramParameter(shdr.program, 35721); i++) {
 				info = gl.getActiveAttrib(shdr.program, i);
-				if (info.name == "gl_InstanceID") continue;
+				if (info.name.startsWith("gl_")) continue;   // built-ins (gl_InstanceID, gl_VertexID) have no attribute location
 				// console.log([info.name, info]);
 				shdr.attributes[info.name] = {
 					name: info.name, location: gl.getAttribLocation(shdr.program, info.name),
